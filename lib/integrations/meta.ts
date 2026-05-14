@@ -146,12 +146,19 @@ function mapMetaCampaign(id: string, campaign?: MetaCampaignRaw, insight?: MetaI
 
 function getActionValue(actions: MetaInsightRaw["actions"], match: "purchase") {
   if (!actions) return 0;
-  return actions
-    .filter((action) => {
-      const type = action.action_type.toLowerCase();
-      return match === "purchase" && type.includes("purchase");
-    })
-    .reduce((sum, action) => sum + Number(action.value || 0), 0);
+  if (match === "purchase") {
+    const preferredTypes = [
+      "offsite_conversion.fb_pixel_purchase",
+      "purchase",
+      "omni_purchase",
+      "onsite_web_purchase"
+    ];
+    for (const type of preferredTypes) {
+      const action = actions.find((item) => item.action_type === type);
+      if (action) return Number(action.value || 0);
+    }
+  }
+  return 0;
 }
 
 function normalizeMetaDelivery(status?: string): AdCampaign["delivery"] {
