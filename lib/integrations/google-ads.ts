@@ -1,5 +1,7 @@
 import "server-only";
 
+import { isCredentialKeyConfigured } from "@/lib/db/credentials";
+
 export interface GoogleAdsSyncResult {
   source: "google_ads";
   status: "success" | "demo" | "error";
@@ -15,7 +17,8 @@ export async function syncGoogleAds(): Promise<GoogleAdsSyncResult> {
     "GOOGLE_ADS_REFRESH_TOKEN",
     "GOOGLE_ADS_CUSTOMER_ID"
   ];
-  const missing = required.filter((key) => !process.env[key]);
+  const configured = await Promise.all(required.map(async (key) => ({ key, configured: await isCredentialKeyConfigured("google_ads", key) })));
+  const missing = configured.filter((item) => !item.configured).map((item) => item.key);
   if (missing.length > 0) {
     return {
       source: "google_ads",

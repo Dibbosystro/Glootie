@@ -1,10 +1,10 @@
 import { AppShell } from "@/components/app-shell";
 import { ApiSettingsList, type SettingsIntegrationStatus } from "@/components/api-settings-card";
 import { SyncButton } from "@/components/sync-button";
+import { isCredentialKeyConfigured } from "@/lib/db/credentials";
 import { getDashboardData } from "@/lib/data";
 import { dateShort } from "@/lib/format";
 import { settingsIntegrations, type SettingsIntegrationConfig } from "@/lib/integration-config";
-import { getEnvKeyConfigured } from "@/lib/server-env";
 
 export const dynamic = "force-dynamic";
 
@@ -12,12 +12,12 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
   const data = await getDashboardData();
   const params = await searchParams;
   const oauthMessage = oauthStatusMessage(Array.isArray(params?.oauth) ? params?.oauth[0] : params?.oauth);
-  const dataApiSettings = settingsIntegrations
+  const dataApiSettings = await Promise.all(settingsIntegrations
     .filter((integration) => integration.kind === "data")
-    .map((integration) => toSettingsStatus(integration, data.integrations.find((item) => item.type === integration.id)));
-  const aiApiSettings = settingsIntegrations
+    .map((integration) => toSettingsStatus(integration, data.integrations.find((item) => item.type === integration.id))));
+  const aiApiSettings = await Promise.all(settingsIntegrations
     .filter((integration) => integration.kind === "ai")
-    .map((integration) => toSettingsStatus(integration, data.integrations.find((item) => item.type === integration.id)));
+    .map((integration) => toSettingsStatus(integration, data.integrations.find((item) => item.type === integration.id))));
 
   return (
     <AppShell data={data}>
@@ -73,8 +73,8 @@ function oauthStatusMessage(code?: string): { tone: "good" | "warn"; text: strin
   return { tone: "warn", text: "Google OAuth did not complete. Check the OAuth app settings and redirect URI." };
 }
 
-function toSettingsStatus(config: SettingsIntegrationConfig, status?: { status: string; message: string; lastSyncedAt: string | null }): SettingsIntegrationStatus {
-  const fieldStatus = config.fields.map((field) => ({ key: field.key, configured: getEnvKeyConfigured(field.key) }));
+async function toSettingsStatus(config: SettingsIntegrationConfig, status?: { status: string; message: string; lastSyncedAt: string | null }): Promise<SettingsIntegrationStatus> {
+  const fieldStatus = await Promise.all(config.fields.map(async (field) => ({ key: field.key, configured: await isCredentialKeyConfigured(config.id, field.key) })));
   return {
     ...config,
     configured: fieldStatus.some((field) => field.configured),

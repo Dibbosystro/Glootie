@@ -173,7 +173,7 @@ export async function recordSyncRun(client: Client, run: Omit<SyncRun, "id" | "s
   });
 }
 
-async function upsertClient(client: Client): Promise<string> {
+export async function upsertClient(client: Client): Promise<string> {
   const db = getDb();
   if (!db) throw new Error("Database is not configured.");
 

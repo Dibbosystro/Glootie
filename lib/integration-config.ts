@@ -164,3 +164,7 @@ export const settingsIntegrations: SettingsIntegrationConfig[] = [
 ];
 
 export const allowedSettingsEnvKeys = new Set(settingsIntegrations.flatMap((integration) => integration.fields.map((field) => field.key)));
+
+export function getSettingsIntegrationForKey(key: string): SettingsIntegrationConfig | undefined {
+  return settingsIntegrations.find((integration) => integration.fields.some((field) => field.key === key));
+}

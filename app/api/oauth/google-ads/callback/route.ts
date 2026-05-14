@@ -1,7 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { getServerEnv, upsertLocalEnv } from "@/lib/server-env";
+import { getDb } from "@/lib/db/client";
+import { getCredentialValue, upsertStoredIntegrationCredentials } from "@/lib/db/credentials";
+import { canEncryptCredentials } from "@/lib/security/encryption";
+import { upsertLocalEnv } from "@/lib/server-env";
 
 const stateCookieName = "glootie_google_ads_oauth_state";
 
@@ -29,17 +32,19 @@ export async function GET(request: Request) {
     return settingsRedirect(request, "google-oauth-state");
   }
 
-  const clientId = getServerEnv("GOOGLE_ADS_CLIENT_ID");
-  const clientSecret = getServerEnv("GOOGLE_ADS_CLIENT_SECRET");
+  const clientId = await getCredentialValue("google_ads", "GOOGLE_ADS_CLIENT_ID");
+  const clientSecret = await getCredentialValue("google_ads", "GOOGLE_ADS_CLIENT_SECRET");
   if (!clientId || !clientSecret) return settingsRedirect(request, "missing-google-oauth-client");
 
-  const tokenResponse = await exchangeCodeForToken(code, clientId, clientSecret, getGoogleAdsRedirectUri(request));
+  const tokenResponse = await exchangeCodeForToken(code, clientId, clientSecret, await getGoogleAdsRedirectUri(request));
   if (!tokenResponse.refresh_token) {
     return settingsRedirect(request, tokenResponse.error ? `google-oauth-${tokenResponse.error}` : "google-oauth-no-refresh-token");
   }
 
   if (process.env.NODE_ENV === "production") {
-    return settingsRedirect(request, "google-oauth-production-storage-needed");
+    if (!getDb() || !canEncryptCredentials()) return settingsRedirect(request, "google-oauth-production-storage-needed");
+    await upsertStoredIntegrationCredentials("google_ads", { GOOGLE_ADS_REFRESH_TOKEN: tokenResponse.refresh_token });
+    return settingsRedirect(request, "google-oauth-connected");
   }
 
   upsertLocalEnv({ GOOGLE_ADS_REFRESH_TOKEN: tokenResponse.refresh_token });
@@ -64,8 +69,8 @@ async function exchangeCodeForToken(code: string, clientId: string, clientSecret
   return (await res.json().catch(() => ({}))) as GoogleTokenResponse;
 }
 
-function getGoogleAdsRedirectUri(request: Request) {
-  const saved = getServerEnv("GOOGLE_ADS_REDIRECT_URI");
+async function getGoogleAdsRedirectUri(request: Request) {
+  const saved = await getCredentialValue("google_ads", "GOOGLE_ADS_REDIRECT_URI");
   if (saved) return saved;
   return new URL("/api/oauth/google-ads/callback", request.url).toString();
 }

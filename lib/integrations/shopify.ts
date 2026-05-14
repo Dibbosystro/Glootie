@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Product } from "@/lib/types";
 import { getServerEnv } from "@/lib/server-env";
+import { getCredentialValue } from "@/lib/db/credentials";
 import { persistShopifySnapshot, recordSyncRun } from "@/lib/db/persistence";
 import { seedClient } from "@/lib/seed";
 
@@ -52,8 +53,8 @@ export interface ShopifyInsights {
 }
 
 export async function syncShopify(): Promise<ShopifySyncResult> {
-  const shop = getShopifyStoreDomain();
-  const token = getShopifyAccessToken();
+  const shop = await getShopifyStoreDomain();
+  const token = await getShopifyAccessToken();
   if (!shop || !token) {
     const result = {
       source: "shopify",
@@ -89,8 +90,8 @@ export async function syncShopify(): Promise<ShopifySyncResult> {
 }
 
 export async function fetchShopifyProducts(): Promise<{ products: Product[]; insights: ShopifyInsights; ordersRead: boolean }> {
-  const shop = getShopifyStoreDomain();
-  const token = getShopifyAccessToken();
+  const shop = await getShopifyStoreDomain();
+  const token = await getShopifyAccessToken();
   if (!shop || !token) return { products: [], insights: emptyShopifyInsights(), ordersRead: false };
 
   const rawProducts = await fetchAllShopifyPages<ShopifyProductRaw>(
@@ -146,7 +147,7 @@ async function fetchProductSalesSignals(shop: string, token: string): Promise<{ 
 }
 
 async function fetchAllShopifyPages<T>(firstUrl: string, providedToken?: string): Promise<T[]> {
-  const token = providedToken ?? getShopifyAccessToken();
+  const token = providedToken ?? (await getShopifyAccessToken());
   if (!token) return [];
 
   const rows: T[] = [];
@@ -239,13 +240,13 @@ function normalizeShopifyStatus(status: string): Product["status"] {
   return "active";
 }
 
-function getShopifyStoreDomain() {
-  const raw = getServerEnv("SHOPIFY_STORE_DOMAIN") || getServerEnv("SHOPIFY_CRG_STORE");
+async function getShopifyStoreDomain() {
+  const raw = (await getCredentialValue("shopify", "SHOPIFY_STORE_DOMAIN")) || getServerEnv("SHOPIFY_CRG_STORE");
   return raw?.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
-function getShopifyAccessToken() {
-  return getServerEnv("SHOPIFY_ADMIN_ACCESS_TOKEN") || getServerEnv("SHOPIFY_CRG_TOKEN");
+async function getShopifyAccessToken() {
+  return (await getCredentialValue("shopify", "SHOPIFY_ADMIN_ACCESS_TOKEN")) || getServerEnv("SHOPIFY_CRG_TOKEN");
 }
 
 function fallbackProductImage(title: string) {

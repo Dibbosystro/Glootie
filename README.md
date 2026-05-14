@@ -85,7 +85,10 @@ Database:
 
 ```text
 DATABASE_URL=
+CREDENTIAL_ENCRYPTION_KEY=
 ```
+
+`CREDENTIAL_ENCRYPTION_KEY` is required in production before saving integration credentials from the Settings page. It should be a long random string, different from `AUTH_COOKIE_SECRET`. Saved credentials are encrypted server-side and stored in Postgres, then read only by server routes and sync jobs.
 
 Shopify:
 
@@ -110,15 +113,20 @@ GOOGLE_ADS_CLIENT_SECRET=
 GOOGLE_ADS_REFRESH_TOKEN=
 GOOGLE_ADS_CUSTOMER_ID=
 GOOGLE_ADS_LOGIN_CUSTOMER_ID=
+GOOGLE_ADS_REDIRECT_URI=
 ```
 
 AI providers:
 
 ```text
 OPENAI_API_KEY=
+OPENAI_MODEL=
 ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=
 GEMINI_API_KEY=
+GEMINI_MODEL=
 OPENROUTER_API_KEY=
+OPENROUTER_MODEL=
 NEOKENS_KEY=
 NEOKENS_BASE_URL=
 NEOKENS_MODEL=
@@ -131,9 +139,11 @@ Never commit `.env.local`.
 1. Import this GitHub repo into Vercel.
 2. Select the Next.js framework preset.
 3. Add a Neon Postgres database and set `DATABASE_URL`.
-4. Add `APP_ACCESS_PASSWORD`, `AUTH_COOKIE_SECRET`, and `CRON_SECRET`.
-5. Add Shopify, Meta, Google Ads, and AI provider credentials as they become available.
+4. Add `APP_ACCESS_PASSWORD`, `AUTH_COOKIE_SECRET`, `CRON_SECRET`, and `CREDENTIAL_ENCRYPTION_KEY`.
+5. Add Shopify, Meta, Google Ads, and AI provider credentials in Settings or as Vercel environment variables.
 6. Deploy.
+
+In production, Settings saves integration credentials into the database as encrypted JSON. The browser can add, replace, or remove credentials, but saved secret values are never returned to the browser. Google Ads OAuth stores the refresh token the same way when the database and encryption key are configured.
 
 The production cron job is defined in `vercel.json`:
 

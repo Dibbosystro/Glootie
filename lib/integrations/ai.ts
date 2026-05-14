@@ -1,7 +1,7 @@
 import "server-only";
 
 import { seedProducts } from "@/lib/seed";
-import { getServerEnv } from "@/lib/server-env";
+import { getCredentialValue } from "@/lib/db/credentials";
 import type { AiProviderId } from "@/lib/types";
 import { getStoredProductAiContext } from "@/lib/db/ai-context";
 
@@ -54,7 +54,7 @@ Shop now`
 }
 
 async function tryOpenAiCopy(prompt: string): Promise<string | null> {
-  const apiKey = getServerEnv("OPENAI_API_KEY");
+  const apiKey = await getCredentialValue("openai", "OPENAI_API_KEY");
   if (!apiKey) return null;
 
   try {
@@ -65,7 +65,7 @@ async function tryOpenAiCopy(prompt: string): Promise<string | null> {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: getServerEnv("OPENAI_MODEL") ?? "gpt-4o-mini",
+        model: (await getCredentialValue("openai", "OPENAI_MODEL")) ?? "gpt-4o-mini",
         messages: [
           { role: "system", content: "You write direct-response ecommerce ad copy for motorcycle parts. No hype, no false claims." },
           { role: "user", content: prompt }
@@ -86,11 +86,11 @@ async function tryOpenAiCopy(prompt: string): Promise<string | null> {
 }
 
 async function tryNeokensCopy(prompt: string): Promise<string | null> {
-  const apiKey = getServerEnv("NEOKENS_KEY");
+  const apiKey = await getCredentialValue("neokens", "NEOKENS_KEY");
   if (!apiKey) return null;
 
-  const baseUrl = (getServerEnv("NEOKENS_BASE_URL") ?? "https://api.neokens.com/").replace(/\/+$/, "");
-  const model = getServerEnv("NEOKENS_MODEL") ?? "claude-sonnet-4-6-thinking";
+  const baseUrl = ((await getCredentialValue("neokens", "NEOKENS_BASE_URL")) ?? "https://api.neokens.com/").replace(/\/+$/, "");
+  const model = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? "claude-sonnet-4-6-thinking";
 
   try {
     const res = await fetch(`${baseUrl}/v1/messages`, {

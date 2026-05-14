@@ -4,6 +4,7 @@ import type { AdCampaign, DashboardData, IntegrationStatus, Kpi, Product, Provid
 import { seedCampaigns, seedClient, seedIntegrations, seedProducts, seedRecommendations, seedSyncRuns } from "@/lib/seed";
 import { currency, percent, roas } from "@/lib/format";
 import { getServerEnv } from "@/lib/server-env";
+import { isCredentialKeyConfigured } from "@/lib/db/credentials";
 import { fetchShopifyProducts } from "@/lib/integrations/shopify";
 import { fetchMetaCampaigns } from "@/lib/integrations/meta";
 
@@ -17,7 +18,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     ...(liveMetaCampaigns.length > 0 ? liveMetaCampaigns : seedCampaigns.filter((campaign) => campaign.source === "meta"))
   ];
   const recommendations = liveProducts.length > 0 ? buildProductRecommendations(products, campaigns) : seedRecommendations;
-  const integrations = withRuntimeConnectionStatus(seedIntegrations).map((integration) => {
+  const integrations = (await withRuntimeConnectionStatus(seedIntegrations)).map((integration) => {
     if (integration.type === "shopify" && shopifyResult.status === "rejected") {
       return { ...integration, status: "error" as const, message: shopifyResult.reason instanceof Error ? shopifyResult.reason.message : "Shopify sync failed." };
     }
@@ -38,16 +39,15 @@ export async function getDashboardData(): Promise<DashboardData> {
   };
 }
 
-function withRuntimeConnectionStatus(integrations: IntegrationStatus[]): IntegrationStatus[] {
-  const hasShopify = Boolean(getServerEnv("SHOPIFY_STORE_DOMAIN") && getServerEnv("SHOPIFY_ADMIN_ACCESS_TOKEN"));
-  const hasMeta = Boolean(getServerEnv("META_ACCESS_TOKEN") && getServerEnv("META_AD_ACCOUNT_ID"));
-  const hasGoogle = Boolean(
-    getServerEnv("GOOGLE_ADS_DEVELOPER_TOKEN") &&
-      getServerEnv("GOOGLE_ADS_CLIENT_ID") &&
-      getServerEnv("GOOGLE_ADS_CLIENT_SECRET") &&
-      getServerEnv("GOOGLE_ADS_REFRESH_TOKEN") &&
-      getServerEnv("GOOGLE_ADS_CUSTOMER_ID")
-  );
+async function withRuntimeConnectionStatus(integrations: IntegrationStatus[]): Promise<IntegrationStatus[]> {
+  const [hasShopify, hasMeta, hasGoogle, hasOpenAi, hasNeokens] = await Promise.all([
+    hasIntegrationKeys("shopify", ["SHOPIFY_STORE_DOMAIN", "SHOPIFY_ADMIN_ACCESS_TOKEN"]),
+    hasIntegrationKeys("meta", ["META_ACCESS_TOKEN", "META_AD_ACCOUNT_ID"]),
+    hasIntegrationKeys("google_ads", ["GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN", "GOOGLE_ADS_CUSTOMER_ID"]),
+    hasIntegrationKeys("openai", ["OPENAI_API_KEY"]),
+    hasIntegrationKeys("neokens", ["NEOKENS_KEY"])
+  ]);
+
   return integrations.map((integration) => {
     if (integration.type === "shopify" && hasShopify) {
       return { ...integration, status: "connected", message: "Configured for live Shopify Admin API sync." };
@@ -58,14 +58,19 @@ function withRuntimeConnectionStatus(integrations: IntegrationStatus[]): Integra
     if (integration.type === "google_ads" && hasGoogle) {
       return { ...integration, status: "demo", message: "Google Ads credentials are present, but live campaign sync is not enabled yet." };
     }
-    if (integration.type === "openai" && getServerEnv("OPENAI_API_KEY")) {
+    if (integration.type === "openai" && hasOpenAi) {
       return { ...integration, status: "connected", message: "Configured for AI generation." };
     }
-    if (integration.type === "neokens" && getServerEnv("NEOKENS_KEY")) {
+    if (integration.type === "neokens" && hasNeokens) {
       return { ...integration, status: "connected", message: "Configured for Neokens AI generation." };
     }
     return integration;
   });
+}
+
+async function hasIntegrationKeys(integrationType: string, keys: string[]): Promise<boolean> {
+  const configured = await Promise.all(keys.map((key) => isCredentialKeyConfigured(integrationType, key)));
+  return configured.every(Boolean);
 }
 
 export function getOverviewKpis(data: DashboardData): Kpi[] {

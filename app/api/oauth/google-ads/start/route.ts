@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { getServerEnv } from "@/lib/server-env";
+import { getCredentialValue } from "@/lib/db/credentials";
 
 const googleAdsScope = "https://www.googleapis.com/auth/adwords";
 const stateCookieName = "glootie_google_ads_oauth_state";
@@ -11,12 +11,12 @@ export async function GET(request: Request) {
   const denied = await requireAccess();
   if (denied) return denied;
 
-  const clientId = getServerEnv("GOOGLE_ADS_CLIENT_ID");
+  const clientId = await getCredentialValue("google_ads", "GOOGLE_ADS_CLIENT_ID");
   if (!clientId) {
     return NextResponse.redirect(new URL("/settings?oauth=missing-google-client-id", request.url));
   }
 
-  const redirectUri = getGoogleAdsRedirectUri(request);
+  const redirectUri = await getGoogleAdsRedirectUri(request);
   const state = randomUUID();
   const cookieStore = await cookies();
   cookieStore.set(stateCookieName, state, {
@@ -40,8 +40,8 @@ export async function GET(request: Request) {
   return NextResponse.redirect(url);
 }
 
-function getGoogleAdsRedirectUri(request: Request) {
-  const saved = getServerEnv("GOOGLE_ADS_REDIRECT_URI");
+async function getGoogleAdsRedirectUri(request: Request) {
+  const saved = await getCredentialValue("google_ads", "GOOGLE_ADS_REDIRECT_URI");
   if (saved) return saved;
   return new URL("/api/oauth/google-ads/callback", request.url).toString();
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { AdCampaign } from "@/lib/types";
-import { getServerEnv } from "@/lib/server-env";
+import { getCredentialValue } from "@/lib/db/credentials";
 import { persistAdCampaignSnapshot, recordSyncRun } from "@/lib/db/persistence";
 import { seedClient } from "@/lib/seed";
 
@@ -38,8 +38,8 @@ interface MetaInsightRaw {
 }
 
 export async function syncMetaAds(): Promise<MetaSyncResult> {
-  const token = getServerEnv("META_ACCESS_TOKEN");
-  const adAccountId = getServerEnv("META_AD_ACCOUNT_ID");
+  const token = await getCredentialValue("meta", "META_ACCESS_TOKEN");
+  const adAccountId = await getCredentialValue("meta", "META_AD_ACCOUNT_ID");
   if (!token || !adAccountId) {
     const result = {
       source: "meta",
@@ -75,8 +75,8 @@ export async function syncMetaAds(): Promise<MetaSyncResult> {
 }
 
 export async function fetchMetaCampaigns(): Promise<AdCampaign[]> {
-  const token = getServerEnv("META_ACCESS_TOKEN");
-  const adAccountId = getServerEnv("META_AD_ACCOUNT_ID");
+  const token = await getCredentialValue("meta", "META_ACCESS_TOKEN");
+  const adAccountId = await getCredentialValue("meta", "META_AD_ACCOUNT_ID");
   if (!token || !adAccountId) return [];
 
   const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
