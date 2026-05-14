@@ -1,36 +1,156 @@
 # Glootie
 
-Client-facing live dashboard for Shopify, Meta Ads, Google Ads, product recommendations, and AI creative tooling.
+Glootie is a private client dashboard for ads, products, and creative decisions.
 
-## What This Is
+It gives clients one place to see what is happening in their paid media, what is working, what is wasting spend, which Shopify products are ready for ads, and what creative ideas to make next.
 
-Glootie is the clean GitHub/Vercel rebuild of the local `Replit-project` prototype. It keeps the product goal from the Replit app: show clients what is happening in their ads and products right now, explain what is working, identify wasted spend, and recommend which Shopify products should be advertised next.
+## What It Does
 
-`Ads Overview.html` remains a visual reference for the Meta-style reporting page. It is not the production source file.
+- Shows live or seed-mode ads performance for Meta Ads and Google Ads.
+- Tracks spend, revenue, ROAS, purchases, cost per purchase, CTR, impressions, and campaign delivery.
+- Classifies campaigns by campaign type, such as bundle offer, product-specific, brand search, generic search, Shopping/catalog, PMax, retargeting, prospecting, and account-wide sales.
+- Monitors Shopify product data, including price, inventory, status, product type, image, and readiness for ads.
+- Creates client-readable product recommendations: scale, test, hold, fix first, or do not advertise.
+- Provides AI tools for ad copy and image prompt generation.
+- Includes API settings for Shopify, Meta, Google Ads, OpenAI, Anthropic, Gemini, OpenRouter, and Neokens.
+- Runs in demo/seed mode when credentials are missing, so the app can still be reviewed and deployed safely.
 
-The local `Replit-project` export is intentionally not committed because it is a large prototype archive, not production source.
+## First Client
+
+The first dashboard is for Cafe Racer Garage.
+
+The app is built so future clients can be added behind the same dashboard structure with separate client records, integrations, campaigns, products, and recommendations.
+
+## Tech Stack
+
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Drizzle ORM
+- Neon Postgres
+- Vercel hosting
+- Vercel Cron for scheduled syncs
+
+## Main Pages
+
+- `/` - Overview dashboard
+- `/ads/meta` - Meta Ads performance
+- `/ads/google` - Google Ads performance
+- `/products` - Shopify product monitor
+- `/products/[id]` - Product detail and linked ad campaigns
+- `/opportunities` - Product and campaign recommendations
+- `/ad-copy` - AI ad copy studio
+- `/image-maker` - AI image prompt studio
+- `/settings` - Integrations, API keys, and manual syncs
 
 ## Local Setup
 
+Install dependencies:
+
 ```bash
 npm install
+```
+
+Create a local env file:
+
+```bash
+cp .env.example .env.local
+```
+
+Run the app:
+
+```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open:
 
-The app works with seed data when live credentials are missing. Set the variables from `.env.example` to enable live sync routes.
+```text
+http://localhost:3000
+```
 
-## Vercel Setup
+The app works without live credentials by using seed data.
 
-1. Push this folder as its own GitHub repo.
-2. Import the repo into Vercel.
-3. Add Neon/Postgres from Vercel Marketplace and set `DATABASE_URL`.
+## Environment Variables
+
+Private access:
+
+```text
+APP_ACCESS_PASSWORD=
+AUTH_COOKIE_SECRET=
+CRON_SECRET=
+```
+
+Database:
+
+```text
+DATABASE_URL=
+```
+
+Shopify:
+
+```text
+SHOPIFY_STORE_DOMAIN=
+SHOPIFY_ADMIN_ACCESS_TOKEN=
+```
+
+Meta Ads:
+
+```text
+META_ACCESS_TOKEN=
+META_AD_ACCOUNT_ID=
+```
+
+Google Ads:
+
+```text
+GOOGLE_ADS_DEVELOPER_TOKEN=
+GOOGLE_ADS_CLIENT_ID=
+GOOGLE_ADS_CLIENT_SECRET=
+GOOGLE_ADS_REFRESH_TOKEN=
+GOOGLE_ADS_CUSTOMER_ID=
+GOOGLE_ADS_LOGIN_CUSTOMER_ID=
+```
+
+AI providers:
+
+```text
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+GEMINI_API_KEY=
+OPENROUTER_API_KEY=
+NEOKENS_KEY=
+NEOKENS_BASE_URL=
+NEOKENS_MODEL=
+```
+
+Never commit `.env.local`.
+
+## Vercel Deployment
+
+1. Import this GitHub repo into Vercel.
+2. Select the Next.js framework preset.
+3. Add a Neon Postgres database and set `DATABASE_URL`.
 4. Add `APP_ACCESS_PASSWORD`, `AUTH_COOKIE_SECRET`, and `CRON_SECRET`.
-5. Add platform credentials as they become available.
+5. Add Shopify, Meta, Google Ads, and AI provider credentials as they become available.
 6. Deploy.
 
-## Commands
+The production cron job is defined in `vercel.json`:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/sync/all",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}
+```
+
+The sync endpoint should be protected with `CRON_SECRET`.
+
+## Useful Commands
 
 ```bash
 npm run typecheck
@@ -38,3 +158,9 @@ npm run lint
 npm run build
 npm run db:push
 ```
+
+## Notes
+
+`Ads Overview.html` is kept as a visual reference for the ads-reporting style. It is not the production source.
+
+The local `Replit-project` export is intentionally ignored because it is a large prototype archive, not deployable production source.
