@@ -9,18 +9,16 @@ import { currency, number as formatNumber, percent, roas } from "@/lib/format";
 import type { AdCampaign, DashboardData, Product, Recommendation } from "@/lib/types";
 
 type Channel = "all" | "meta" | "google";
-type TimeRange = "day" | "week" | "month";
 type PieSegment = {
   label: string;
   value: number;
   color: string;
 };
 
-export default async function OverviewPage({ searchParams }: { searchParams?: Promise<{ channel?: string | string[]; range?: string | string[] }> }) {
+export default async function OverviewPage({ searchParams }: { searchParams?: Promise<{ channel?: string | string[] }> }) {
   const data = await getDashboardData();
   const params = await searchParams;
   const channel = parseChannel(params?.channel);
-  const range = parseRange(params?.range);
   const channelView = getChannelView(data, channel);
   const viewData = { ...data, campaigns: channelView.campaigns };
   const kpis = getChannelKpis(viewData, channel, channelView.stale);
@@ -40,8 +38,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
             <p className="mt-1 text-sm text-[#6f6b78]">Here is what is selling, spending, and ready for ads today.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <RangeToggle selected={range} channel={channel} />
-            <ChannelToggle selected={channel} range={range} data={data} />
+            <ChannelToggle selected={channel} data={data} />
             <SyncButton source="all" label="Recompute" appearance="primary-pill" />
           </div>
         </section>
@@ -206,28 +203,32 @@ function ShopifySalesSessionCard({ data }: { data: DashboardData }) {
           value={currency(revenue, data.client.currency)}
           helper={`${formatNumber(orders)} orders`}
           segments={salesSegments}
+          emptyValue="--"
           emptyLabel="No Shopify sales yet"
         />
         <MiniPie
           title="Sessions"
-          value={formatNumber(sessions)}
-          helper={sessions > 0 ? `${percent(orders / Math.max(sessions, 1), 2)} order rate` : "Connect analytics"}
+          value={sessions > 0 ? formatNumber(sessions) : "--"}
+          helper={sessions > 0 ? `${percent(orders / Math.max(sessions, 1), 2)} order rate` : "Coming soon"}
           segments={sessionSegments}
-          emptyLabel="No session data yet"
+          emptyValue="--"
+          emptyLabel="Analytics integration in progress"
         />
       </div>
 
       <div className="mt-4 space-y-2">
         <SignalLegend label="Top sales source" segments={salesSegments} emptyLabel="Waiting for Shopify orders" />
-        <SignalLegend label="Top session source" segments={sessionSegments} emptyLabel="Sessions will appear after analytics sync" />
+        <SignalLegend label="Top session source" segments={sessionSegments} emptyLabel="Coming soon, analytics integration in progress" />
       </div>
     </div>
   );
 }
 
-function MiniPie({ title, value, helper, segments, emptyLabel }: { title: string; value: string; helper: string; segments: PieSegment[]; emptyLabel: string }) {
+function MiniPie({ title, value, helper, segments, emptyValue, emptyLabel }: { title: string; value: string; helper: string; segments: PieSegment[]; emptyValue: string; emptyLabel: string }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   const background = total > 0 ? pieGradient(segments, total) : "conic-gradient(#eeeaf5 0deg 360deg)";
+  const displayValue = total > 0 ? value : emptyValue;
+  const caption = total > 0 ? helper : emptyLabel;
 
   return (
     <div className="rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] p-3">
@@ -235,14 +236,11 @@ function MiniPie({ title, value, helper, segments, emptyLabel }: { title: string
       <div className="mt-3 grid place-items-center">
         <div className="relative grid h-24 w-24 place-items-center rounded-full" style={{ background }}>
           <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-white text-center shadow-inner">
-            <div>
-              <div className="mono text-sm font-bold leading-tight text-[#111014]">{value}</div>
-              <div className="mt-1 text-[9px] font-semibold text-[#6f6b78]">{total > 0 ? helper : emptyLabel}</div>
-            </div>
+            <div className="mono text-sm font-bold leading-tight text-[#111014]">{displayValue}</div>
           </div>
         </div>
       </div>
-      <p className="mt-3 truncate text-center text-[11px] text-[#6f6b78]">{helper}</p>
+      <p className="mt-3 truncate text-center text-[11px] font-medium text-[#6f6b78]">{caption}</p>
     </div>
   );
 }
@@ -288,11 +286,11 @@ function pieGradient(segments: PieSegment[], total: number) {
   return `conic-gradient(${stops.join(", ")})`;
 }
 
-function ChannelToggle({ selected, range, data }: { selected: Channel; range: TimeRange; data: DashboardData }) {
+function ChannelToggle({ selected, data }: { selected: Channel; data: DashboardData }) {
   const options: Array<{ channel: Channel; label: string; href: string }> = [
-    { channel: "all", label: "All", href: overviewHref("all", range) },
-    { channel: "meta", label: "Meta", href: overviewHref("meta", range) },
-    { channel: "google", label: "Google", href: overviewHref("google", range) }
+    { channel: "all", label: "All", href: overviewHref("all") },
+    { channel: "meta", label: "Meta", href: overviewHref("meta") },
+    { channel: "google", label: "Google", href: overviewHref("google") }
   ];
 
   return (
@@ -308,31 +306,6 @@ function ChannelToggle({ selected, range, data }: { selected: Channel; range: Ti
               active ? "bg-[#111014] text-white" : stale ? "text-[#6d28d9] hover:bg-[#f2ecff]" : "text-[#6f6b78] hover:bg-[#f1eef8]"
             }`}
             title={stale ? `${option.label} is showing stale/demo data` : `${option.label} is connected`}
-          >
-            {option.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function RangeToggle({ selected, channel }: { selected: TimeRange; channel: Channel }) {
-  const options: Array<{ range: TimeRange; label: string }> = [
-    { range: "day", label: "Day" },
-    { range: "week", label: "Week" },
-    { range: "month", label: "Month" }
-  ];
-
-  return (
-    <div className="inline-flex rounded-full border border-[#e8e4ef] bg-white p-0.5 text-xs shadow-sm">
-      {options.map((option) => {
-        const active = selected === option.range;
-        return (
-          <Link
-            key={option.range}
-            href={overviewHref(channel, option.range)}
-            className={`rounded-full px-3 py-1.5 transition ${active ? "bg-[#111014] font-semibold text-white" : "text-[#6f6b78] hover:bg-[#f1eef8]"}`}
           >
             {option.label}
           </Link>
@@ -455,16 +428,9 @@ function parseChannel(value: string | string[] | undefined): Channel {
   return "all";
 }
 
-function parseRange(value: string | string[] | undefined): TimeRange {
-  const range = Array.isArray(value) ? value[0] : value;
-  if (range === "day" || range === "month") return range;
-  return "week";
-}
-
-function overviewHref(channel: Channel, range: TimeRange) {
+function overviewHref(channel: Channel) {
   const params = new URLSearchParams();
   if (channel !== "all") params.set("channel", channel);
-  if (range !== "week") params.set("range", range);
   const query = params.toString();
   return query ? `/?${query}` : "/";
 }

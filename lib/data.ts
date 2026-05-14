@@ -167,6 +167,7 @@ function buildSeedShopifyInsights(products: Product[]) {
 function buildProductRecommendations(products: Product[], campaigns: AdCampaign[]): Recommendation[] {
   const campaignNames = campaigns.map((campaign) => campaign.name.toLowerCase());
   return [...products]
+    .filter((product) => product.status !== "draft")
     .sort((a, b) => recommendationScore(b, campaignNames) - recommendationScore(a, campaignNames))
     .map((product) => {
       const score = recommendationScore(product, campaignNames);

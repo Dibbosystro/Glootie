@@ -1,11 +1,11 @@
 import type { RecommendationState } from "@/lib/types";
 
 const recommendationClasses: Record<RecommendationState, string> = {
-  scale: "bg-[#e7f5ec] text-[#31a24c]",
-  test: "bg-[#f2ecff] text-[#6d28d9]",
-  hold: "bg-[#f2ecff] text-[#6d28d9]",
-  fix_first: "bg-[#f2ecff] text-[#6d28d9]",
-  do_not_advertise: "bg-[#f2ecff] text-[#6d28d9]"
+  scale: "bg-[#e7f5ec] text-[#1f7a36]",
+  test: "bg-[#e0ecff] text-[#1e4dc1]",
+  hold: "bg-[#fff4d6] text-[#8a5a00]",
+  fix_first: "bg-[#ffe3cc] text-[#a8480c]",
+  do_not_advertise: "bg-[#fde2e1] text-[#b42318]"
 };
 
 export function RecommendationPill({ state }: { state: RecommendationState }) {

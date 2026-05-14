@@ -31,7 +31,7 @@ export default async function ProductsPage() {
           <InsightCard
             label="Data status"
             value={insights?.sessions30d ? "Analytics connected" : "Sales connected"}
-            helper={insights?.sessions30d ? "Sessions and CVR are live" : "Sessions and CVR need analytics connection"}
+            helper={insights?.sessions30d ? "Sessions and CVR are live" : "Sessions and CVR coming soon"}
           />
         </section>
 
@@ -65,25 +65,25 @@ function getShopifyKpis(insights = {
     {
       label: "Sales 30d",
       value: currency(insights.revenue30d),
-      helper: `${number(insights.unitsSold30d)} units sold`,
+      helper: `${number(insights.unitsSold30d)} units. Σ (price × qty − discount), excludes tax and shipping, may differ from Shopify total`,
       tone: insights.revenue30d > 0 ? "good" : "neutral"
     },
     {
       label: "Orders 30d",
       value: number(insights.orders30d),
-      helper: "Pulled from Shopify orders",
+      helper: "Pulled from Shopify orders, last 30 days",
       tone: insights.orders30d > 0 ? "good" : "neutral"
     },
     {
       label: "Sessions 30d",
       value: number(insights.sessions30d),
-      helper: insights.sessions30d > 0 ? "From store analytics" : "Connect analytics for sessions",
+      helper: insights.sessions30d > 0 ? "From store analytics" : "Coming soon, analytics integration in progress",
       tone: insights.sessions30d > 0 ? "good" : "neutral"
     },
     {
       label: "Conversion Rate",
       value: percent(insights.conversionRate, 2),
-      helper: insights.sessions30d > 0 ? "Orders divided by sessions" : "Waiting for sessions data",
+      helper: insights.sessions30d > 0 ? "Orders divided by sessions" : "Coming soon with analytics integration",
       tone: insights.conversionRate > 0.01 ? "good" : "neutral"
     }
   ];

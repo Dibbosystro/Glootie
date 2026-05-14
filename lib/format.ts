@@ -1,7 +1,8 @@
 export function currency(value: number, code = "AUD"): string {
-  return new Intl.NumberFormat("en-AU", {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: code,
+    currencyDisplay: "symbol",
     maximumFractionDigits: value >= 1000 ? 0 : 2
   }).format(value);
 }

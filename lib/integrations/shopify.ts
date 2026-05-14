@@ -198,9 +198,11 @@ function mapShopifyProduct(product: ShopifyProductRaw, sales?: ProductSalesSigna
 function buildShopifyInsights(products: Product[], orders30d: number): ShopifyInsights {
   const revenue30d = products.reduce((sum, product) => sum + product.revenue30d, 0);
   const unitsSold30d = products.reduce((sum, product) => sum + product.unitsSold30d, 0);
-  const totalInventory = products.reduce((sum, product) => sum + product.inventoryQty, 0);
   const activeProducts = products.filter((product) => product.status === "active").length;
-  const outOfStockProducts = products.filter((product) => product.inventoryQty <= 0).length;
+  const totalInventory = products
+    .filter((product) => product.status === "active")
+    .reduce((sum, product) => sum + Math.max(0, product.inventoryQty), 0);
+  const outOfStockProducts = products.filter((product) => product.status === "active" && product.inventoryQty <= 0).length;
   return {
     revenue30d: Number(revenue30d.toFixed(2)),
     orders30d,
