@@ -13,8 +13,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const liveMetaCampaigns = metaResult.status === "fulfilled" ? metaResult.value : [];
   const products = liveProducts.length > 0 ? liveProducts : seedProducts;
   const campaigns = [
-    ...(liveMetaCampaigns.length > 0 ? liveMetaCampaigns : seedCampaigns.filter((campaign) => campaign.source === "meta")),
-    ...seedCampaigns.filter((campaign) => campaign.source === "google_ads")
+    ...(liveMetaCampaigns.length > 0 ? liveMetaCampaigns : seedCampaigns.filter((campaign) => campaign.source === "meta"))
   ];
   const recommendations = liveProducts.length > 0 ? buildProductRecommendations(products, campaigns) : seedRecommendations;
   const integrations = withRuntimeConnectionStatus(seedIntegrations).map((integration) => {

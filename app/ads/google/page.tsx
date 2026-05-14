@@ -19,7 +19,7 @@ export default async function GoogleAdsPage() {
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Google Ads · {data.client.name}</p>
           <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em]">Google Ads performance</h1>
           <p className="mt-2 max-w-3xl text-sm text-[#65676b]">
-            Search and shopping performance will populate here when Google Ads API credentials are configured. The seed view shows the intended client-facing reporting shape.
+            Search and shopping performance will populate here when Google Ads campaign sync is enabled. Until then, Google Ads metrics remain zero.
           </p>
         </section>
         <MetricStrip kpis={getSourceKpis(data, "google_ads")} />
@@ -31,12 +31,12 @@ export default async function GoogleAdsPage() {
                 <h2 className="text-lg font-bold">Google Ads dashboard</h2>
                 <p className="mt-1 text-sm text-[#65676b]">Search performance, spend pacing, and purchase signal for the connected Google account.</p>
               </div>
-              <div className="rounded-full bg-[#f2ecff] px-3 py-2 text-xs font-bold text-[#6d28d9]">Stale/demo until API sync</div>
+              <div className="rounded-full bg-[#f2ecff] px-3 py-2 text-xs font-bold text-[#6d28d9]">{campaigns.length > 0 ? "Live API view" : "No Google campaign data"}</div>
             </div>
             <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <MiniStat label="Spend" value={currency(totalSpend)} />
               <MiniStat label="Revenue" value={currency(totalRevenue)} />
-              <MiniStat label="Intent" value="Brand search" />
+              <MiniStat label="Campaigns" value={String(campaigns.length)} />
             </div>
             <div className="mt-5 flex h-[220px] items-end gap-2 border-b border-l border-[#e8e4ef] px-3 pb-3">
               {Array.from({ length: 14 }).map((_, index) => {
@@ -66,8 +66,8 @@ export default async function GoogleAdsPage() {
         <section className="card p-5">
           <h2 className="text-lg font-bold">What to do next</h2>
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Note title="Finish API connection" body="Add developer token, OAuth client, refresh token, and customer ID in Settings." />
-            <Note title="Brand Search first" body="Keep budget controlled while Merchant Center and conversion data are being validated." />
+            <Note title="Enable campaign sync" body="Google Ads credentials can be present while campaign reporting still waits for GAQL sync." />
+            <Note title="Keep metrics at zero" body="Until live Google campaign rows are imported, Google Ads should not affect blended totals." />
             <Note title="Match products later" body="Campaign URL and feed data can connect Google campaigns back to Shopify products." />
           </div>
         </section>
