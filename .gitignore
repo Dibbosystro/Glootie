@@ -1,0 +1,13 @@
+.next
+node_modules
+dist
+out
+.turbo
+.env
+.env*.local
+*.log
+.vercel
+coverage
+*.tsbuildinfo
+.DS_Store
+Replit-project
