@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Trash2 } from "lucide-react";
+import { KeyRound, Link2, Trash2 } from "lucide-react";
 import type { SettingsIntegrationConfig } from "@/lib/integration-config";
 
 export interface SettingsIntegrationStatus extends SettingsIntegrationConfig {
@@ -76,6 +76,15 @@ function ApiSettingsCard({ integration }: { integration: SettingsIntegrationStat
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
+          {integration.oauth ? (
+            <a
+              href={integration.oauth.href}
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-[#ddd3f8] bg-[#f2ecff] px-3 text-sm font-bold text-[#6d28d9]"
+            >
+              <Link2 className="h-4 w-4" />
+              OAuth
+            </a>
+          ) : null}
           <button
             type="button"
             onClick={() => setOpen((current) => !current)}
@@ -98,17 +107,38 @@ function ApiSettingsCard({ integration }: { integration: SettingsIntegrationStat
 
       {open ? (
         <div className="mt-4 rounded-2xl bg-stone-50 p-4">
+          {integration.oauth ? (
+            <div className="mb-4 rounded-xl border border-[#ddd3f8] bg-white p-3 text-xs leading-5 text-stone-600">
+              <div className="font-bold text-[#111014]">{integration.oauth.label}</div>
+              <p className="mt-1">{integration.oauth.helper}</p>
+            </div>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {integration.fields.map((field) => (
               <label key={field.key} className="block">
                 <span className="text-xs font-bold text-stone-600">{field.label}</span>
-                <input
-                  type={field.secret ? "password" : "text"}
-                  value={values[field.key] ?? ""}
-                  onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
-                  placeholder={field.placeholder ?? field.key}
-                  className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                />
+                {field.input === "select" ? (
+                  <select
+                    value={values[field.key] ?? ""}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+                    className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                  >
+                    <option value="">Keep current / choose model</option>
+                    {field.options?.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={field.secret ? "password" : "text"}
+                    value={values[field.key] ?? ""}
+                    onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
+                    placeholder={field.placeholder ?? field.key}
+                    className="mt-1 h-10 w-full rounded-md border border-stone-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                  />
+                )}
               </label>
             ))}
           </div>

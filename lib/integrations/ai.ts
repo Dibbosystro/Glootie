@@ -65,7 +65,7 @@ async function tryOpenAiCopy(prompt: string): Promise<string | null> {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: getServerEnv("OPENAI_MODEL") ?? "gpt-4o-mini",
         messages: [
           { role: "system", content: "You write direct-response ecommerce ad copy for motorcycle parts. No hype, no false claims." },
           { role: "user", content: prompt }

@@ -8,8 +8,10 @@ import { getEnvKeyConfigured } from "@/lib/server-env";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams?: Promise<{ oauth?: string | string[] }> }) {
   const data = await getDashboardData();
+  const params = await searchParams;
+  const oauthMessage = oauthStatusMessage(Array.isArray(params?.oauth) ? params?.oauth[0] : params?.oauth);
   const dataApiSettings = settingsIntegrations
     .filter((integration) => integration.kind === "data")
     .map((integration) => toSettingsStatus(integration, data.integrations.find((item) => item.type === integration.id)));
@@ -24,6 +26,11 @@ export default async function SettingsPage() {
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Admin</p>
           <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em]">Settings</h1>
           <p className="mt-2 max-w-3xl text-sm text-[#65676b]">Check live integrations, run manual syncs, and see which AI provider keys are configured.</p>
+          {oauthMessage ? (
+            <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${oauthMessage.tone === "good" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-[#ddd3f8] bg-[#f2ecff] text-[#6d28d9]"}`}>
+              {oauthMessage.text}
+            </div>
+          ) : null}
         </section>
 
         <section className="card p-5">
@@ -53,6 +60,17 @@ export default async function SettingsPage() {
       </div>
     </AppShell>
   );
+}
+
+function oauthStatusMessage(code?: string): { tone: "good" | "warn"; text: string } | null {
+  if (!code) return null;
+  if (code === "google-oauth-connected") return { tone: "good", text: "Google OAuth connected locally. The refresh token was saved to your app-local environment." };
+  if (code === "missing-google-client-id") return { tone: "warn", text: "Add the Google OAuth client ID before starting the Google Ads OAuth flow." };
+  if (code === "missing-google-oauth-client") return { tone: "warn", text: "Add both Google OAuth client ID and client secret before finishing OAuth." };
+  if (code === "google-oauth-no-refresh-token") return { tone: "warn", text: "Google did not return a refresh token. Try again with consent prompt or remove the previous app grant in Google Account permissions." };
+  if (code === "google-oauth-production-storage-needed") return { tone: "warn", text: "Google OAuth worked, but production token storage needs encrypted DB credentials. Do not expose the refresh token in the browser." };
+  if (code === "google-oauth-state") return { tone: "warn", text: "Google OAuth state check failed. Start the connection flow again from this page." };
+  return { tone: "warn", text: "Google OAuth did not complete. Check the OAuth app settings and redirect URI." };
 }
 
 function toSettingsStatus(config: SettingsIntegrationConfig, status?: { status: string; message: string; lastSyncedAt: string | null }): SettingsIntegrationStatus {
