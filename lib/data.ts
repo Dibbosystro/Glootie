@@ -4,18 +4,35 @@ import type { AdCampaign, DashboardData, IntegrationStatus, Kpi, Product, Provid
 import { seedCampaigns, seedClient, seedIntegrations, seedProducts, seedRecommendations, seedSyncRuns } from "@/lib/seed";
 import { currency, percent, roas } from "@/lib/format";
 import { getServerEnv } from "@/lib/server-env";
+import { fetchShopifyProducts } from "@/lib/integrations/shopify";
+import { fetchMetaCampaigns } from "@/lib/integrations/meta";
 
 export async function getDashboardData(): Promise<DashboardData> {
-  // The data layer is intentionally centralized so seed mode can be replaced by
-  // Drizzle queries without changing page components.
-  const integrations = withRuntimeConnectionStatus(seedIntegrations);
+  const [shopifyResult, metaResult] = await Promise.allSettled([fetchShopifyProducts(), fetchMetaCampaigns()]);
+  const liveProducts = shopifyResult.status === "fulfilled" ? shopifyResult.value.products : [];
+  const liveMetaCampaigns = metaResult.status === "fulfilled" ? metaResult.value : [];
+  const products = liveProducts.length > 0 ? liveProducts : seedProducts;
+  const campaigns = [
+    ...(liveMetaCampaigns.length > 0 ? liveMetaCampaigns : seedCampaigns.filter((campaign) => campaign.source === "meta")),
+    ...seedCampaigns.filter((campaign) => campaign.source === "google_ads")
+  ];
+  const recommendations = liveProducts.length > 0 ? buildProductRecommendations(products, campaigns) : seedRecommendations;
+  const integrations = withRuntimeConnectionStatus(seedIntegrations).map((integration) => {
+    if (integration.type === "shopify" && shopifyResult.status === "rejected") {
+      return { ...integration, status: "error" as const, message: shopifyResult.reason instanceof Error ? shopifyResult.reason.message : "Shopify sync failed." };
+    }
+    if (integration.type === "meta" && metaResult.status === "rejected") {
+      return { ...integration, status: "error" as const, message: metaResult.reason instanceof Error ? metaResult.reason.message : "Meta sync failed." };
+    }
+    return integration;
+  });
   return {
     client: seedClient,
     generatedAt: new Date().toISOString(),
     integrations,
-    products: seedProducts,
-    campaigns: seedCampaigns,
-    recommendations: seedRecommendations,
+    products,
+    campaigns,
+    recommendations,
     syncRuns: seedSyncRuns
   };
 }
@@ -122,4 +139,77 @@ export function getProviderKeyStatuses(): ProviderKeyStatus[] {
 
 function sumCampaigns(campaigns: AdCampaign[], field: keyof Pick<AdCampaign, "spend30d" | "revenue30d" | "purchases30d" | "impressions30d" | "reach30d" | "clicks30d">): number {
   return campaigns.reduce((sum, campaign) => sum + Number(campaign[field] ?? 0), 0);
+}
+
+function buildProductRecommendations(products: Product[], campaigns: AdCampaign[]): Recommendation[] {
+  const campaignNames = campaigns.map((campaign) => campaign.name.toLowerCase());
+  return [...products]
+    .sort((a, b) => recommendationScore(b, campaignNames) - recommendationScore(a, campaignNames))
+    .map((product) => {
+      const score = recommendationScore(product, campaignNames);
+      const hasCampaignNameMatch = campaignNames.some((name) => product.title.toLowerCase().split(/\s+/).some((word) => word.length > 4 && name.includes(word)));
+      const state =
+        product.status !== "active" || product.inventoryQty <= 0
+          ? "do_not_advertise"
+          : product.inventoryQty < 5
+          ? "hold"
+          : product.revenue30d >= 500 && !hasCampaignNameMatch
+          ? "scale"
+          : product.revenue30d > 0
+          ? "test"
+          : "fix_first";
+
+      const reason =
+        product.status !== "active"
+          ? "This product is not active in Shopify yet. Fix the product status before sending ad traffic."
+          : product.inventoryQty <= 0
+          ? "This product has zero inventory. Do not send paid traffic until stock is back."
+          : product.inventoryQty < 5
+          ? "Inventory is low, so hold paid traffic unless replenishment is confirmed."
+          : product.revenue30d >= 500 && !hasCampaignNameMatch
+          ? "This product has recent Shopify sales and enough stock, but no obvious matching campaign name. It is a good candidate to test next."
+          : product.revenue30d > 0
+          ? "This product has recent Shopify sales and enough inventory. Validate it with a controlled test before scaling."
+          : "This product has stock but no recent Shopify sales signal. Check page quality, margin, and offer before advertising.";
+
+      return {
+        id: `rec-${product.id}`,
+        productId: product.id,
+        state,
+        score,
+        headline: recommendationHeadline(state),
+        reason,
+        nextAction: recommendationNextAction(state),
+        signals: [
+          `${product.inventoryQty} in stock`,
+          `${currency(product.revenue30d)} Shopify revenue in 30 days`,
+          `${product.unitsSold30d} units sold in 30 days`
+        ]
+      };
+    });
+}
+
+function recommendationScore(product: Product, campaignNames: string[]) {
+  const stockScore = Math.min(product.inventoryQty / 20, 1) * 35;
+  const revenueScore = Math.min(product.revenue30d / 1000, 1) * 45;
+  const salesScore = Math.min(product.unitsSold30d / 10, 1) * 20;
+  const campaignPenalty = campaignNames.some((name) => name.includes(product.title.toLowerCase())) ? 8 : 0;
+  const inactivePenalty = product.status !== "active" || product.inventoryQty <= 0 ? 100 : 0;
+  return Number(Math.max(0, stockScore + revenueScore + salesScore - campaignPenalty - inactivePenalty).toFixed(2));
+}
+
+function recommendationHeadline(state: Recommendation["state"]) {
+  if (state === "scale") return "Advertise this";
+  if (state === "test") return "Test next";
+  if (state === "hold") return "Hold";
+  if (state === "do_not_advertise") return "Do not advertise";
+  return "Fix first";
+}
+
+function recommendationNextAction(state: Recommendation["state"]) {
+  if (state === "scale") return "Build a focused product ad or bundle angle and test it with controlled spend.";
+  if (state === "test") return "Create a small validation campaign before scaling.";
+  if (state === "hold") return "Confirm stock before adding spend.";
+  if (state === "do_not_advertise") return "Fix availability before paid traffic.";
+  return "Improve the product page, offer, or proof before launch.";
 }
