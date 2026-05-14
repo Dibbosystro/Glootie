@@ -3,17 +3,21 @@ import "server-only";
 import { seedProducts } from "@/lib/seed";
 import { getServerEnv } from "@/lib/server-env";
 import type { AiProviderId } from "@/lib/types";
+import { getStoredProductAiContext } from "@/lib/db/ai-context";
 
 type ChatResult = { output: string; provider: Exclude<AiProviderId, "auto"> | "fallback" };
 
 export async function generateAdCopy(productId: string, angle: string, provider: AiProviderId = "auto"): Promise<ChatResult> {
+  const storedContext = await getStoredProductAiContext("Cafe Racer Garage", productId);
   const product = seedProducts.find((item) => item.id === productId) ?? seedProducts[0];
-  if (!product) return { output: "No product selected.", provider: "fallback" };
+  const productTitle = storedContext?.title ?? product?.title;
+  if (!productTitle) return { output: "No product selected.", provider: "fallback" };
 
   const prompt = [
-    `Write Meta ad copy for ${product.title}.`,
+    `Write Meta ad copy for ${productTitle}.`,
     `Angle: ${angle}.`,
     `Audience: motorcycle builders and cafe racer owners.`,
+    storedContext?.contextText ?? "Stored client context from Glootie database: not available yet, use only the product name and do not invent performance claims.",
     "Return primary text, headline, hook, and CTA. Keep it concise and practical."
   ].join("\n");
 
@@ -34,12 +38,12 @@ export async function generateAdCopy(productId: string, angle: string, provider:
   return {
     provider: "fallback",
     output: `Primary text:
-Your cafe racer build should not be held together by guesswork. ${product.title} gives builders a cleaner way to finish the electrical setup without turning the garage into a wiring headache.
+Your cafe racer build should not be held together by guesswork. ${productTitle} gives builders a cleaner way to finish the electrical setup without turning the garage into a wiring headache.
 
 ${urgency}
 
 Headline:
-${product.title} for cleaner custom builds
+${productTitle} for cleaner custom builds
 
 Hook:
 Still fighting wiring issues on your cafe racer?

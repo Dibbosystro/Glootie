@@ -10,6 +10,7 @@ import { fetchMetaCampaigns } from "@/lib/integrations/meta";
 export async function getDashboardData(): Promise<DashboardData> {
   const [shopifyResult, metaResult] = await Promise.allSettled([fetchShopifyProducts(), fetchMetaCampaigns()]);
   const liveProducts = shopifyResult.status === "fulfilled" ? shopifyResult.value.products : [];
+  const liveShopifyInsights = shopifyResult.status === "fulfilled" ? shopifyResult.value.insights : undefined;
   const liveMetaCampaigns = metaResult.status === "fulfilled" ? metaResult.value : [];
   const products = liveProducts.length > 0 ? liveProducts : seedProducts;
   const campaigns = [
@@ -32,7 +33,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     products,
     campaigns,
     recommendations,
-    syncRuns: seedSyncRuns
+    syncRuns: seedSyncRuns,
+    shopifyInsights: liveShopifyInsights ?? buildSeedShopifyInsights(products)
   };
 }
 
@@ -54,7 +56,7 @@ function withRuntimeConnectionStatus(integrations: IntegrationStatus[]): Integra
       return { ...integration, status: "connected", message: "Configured for live Meta Marketing API sync." };
     }
     if (integration.type === "google_ads" && hasGoogle) {
-      return { ...integration, status: "connected", message: "Configured for live Google Ads API sync." };
+      return { ...integration, status: "demo", message: "Google Ads credentials are present, but live campaign sync is not enabled yet." };
     }
     if (integration.type === "openai" && getServerEnv("OPENAI_API_KEY")) {
       return { ...integration, status: "connected", message: "Configured for AI generation." };
@@ -138,6 +140,23 @@ export function getProviderKeyStatuses(): ProviderKeyStatus[] {
 
 function sumCampaigns(campaigns: AdCampaign[], field: keyof Pick<AdCampaign, "spend30d" | "revenue30d" | "purchases30d" | "impressions30d" | "reach30d" | "clicks30d">): number {
   return campaigns.reduce((sum, campaign) => sum + Number(campaign[field] ?? 0), 0);
+}
+
+function buildSeedShopifyInsights(products: Product[]) {
+  const revenue30d = products.reduce((sum, product) => sum + product.revenue30d, 0);
+  const unitsSold30d = products.reduce((sum, product) => sum + product.unitsSold30d, 0);
+  const sessions30d = products.reduce((sum, product) => sum + product.sessions30d, 0);
+  return {
+    revenue30d,
+    orders30d: unitsSold30d,
+    unitsSold30d,
+    sessions30d,
+    conversionRate: sessions30d > 0 ? unitsSold30d / sessions30d : 0,
+    activeProducts: products.filter((product) => product.status === "active").length,
+    totalProducts: products.length,
+    totalInventory: products.reduce((sum, product) => sum + product.inventoryQty, 0),
+    outOfStockProducts: products.filter((product) => product.inventoryQty <= 0).length
+  };
 }
 
 function buildProductRecommendations(products: Product[], campaigns: AdCampaign[]): Recommendation[] {

@@ -5,11 +5,16 @@ import { MetricStrip } from "@/components/metric-strip";
 import { RecommendationPill } from "@/components/status-pill";
 import { SyncButton } from "@/components/sync-button";
 import { getDashboardData, getOverviewKpis } from "@/lib/data";
-import { currency, percent, roas } from "@/lib/format";
-import type { AdCampaign, DashboardData, IntegrationStatus, Product, Recommendation } from "@/lib/types";
+import { currency, number as formatNumber, percent, roas } from "@/lib/format";
+import type { AdCampaign, DashboardData, Product, Recommendation } from "@/lib/types";
 
 type Channel = "all" | "meta" | "google";
 type TimeRange = "day" | "week" | "month";
+type PieSegment = {
+  label: string;
+  value: number;
+  color: string;
+};
 
 export default async function OverviewPage({ searchParams }: { searchParams?: Promise<{ channel?: string | string[]; range?: string | string[] }> }) {
   const data = await getDashboardData();
@@ -31,7 +36,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
       <div className="space-y-4">
         <section className="flex flex-col gap-3 pt-1 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-[#111014]">Good morning, Dibbo</h1>
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-[#111014]">Performance overview</h1>
             <p className="mt-1 text-sm text-[#6f6b78]">Here is what is selling, spending, and ready for ads today.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -96,7 +101,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
           </div>
 
           <div className="space-y-4">
-            <ConnectionsCard integrations={data.integrations} />
+            <ShopifySalesSessionCard data={data} />
             <div className="card p-5">
               <div className="flex items-center justify-between">
                 <h2 className="text-base font-bold">Needs attention</h2>
@@ -174,41 +179,113 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
   );
 }
 
-function ConnectionsCard({ integrations }: { integrations: IntegrationStatus[] }) {
+function ShopifySalesSessionCard({ data }: { data: DashboardData }) {
+  const insights = data.shopifyInsights;
+  const revenue = insights?.revenue30d ?? data.products.reduce((sum, product) => sum + product.revenue30d, 0);
+  const sessions = insights?.sessions30d ?? data.products.reduce((sum, product) => sum + product.sessions30d, 0);
+  const orders = insights?.orders30d ?? data.products.reduce((sum, product) => sum + product.unitsSold30d, 0);
+  const salesSegments = buildProductSegments(data.products, "revenue30d");
+  const sessionSegments = buildProductSegments(data.products, "sessions30d");
+
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-bold">Connections</h2>
-        <span className="text-[10px] text-[#8d8799]">{integrations.length} sources</span>
+        <div>
+          <h2 className="text-base font-bold">Shopify signal</h2>
+          <p className="text-[11px] text-[#6f6b78]">Sales and sessions, last 30 days</p>
+        </div>
+        <Link href="/products" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6d28d9]">
+          Open
+          <ChevronRight className="h-3 w-3" />
+        </Link>
       </div>
-      <div className="mt-4 space-y-3">
-        {integrations.map((integration) => {
-          const connected = integration.status === "connected" || integration.status === "demo";
-          return (
-            <div key={integration.type} className="flex items-center gap-3">
-              <div className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-black text-white ${integrationColor(integration.type)}`}>
-                {integration.label[0]}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{integration.label}</div>
-                <div className="truncate text-[11px] text-[#6f6b78]">{integration.status === "demo" ? "demo source" : integration.status}</div>
-              </div>
-              {connected ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">
-                  <Check className="h-3 w-3" />
-                  {integration.status === "demo" ? "Demo" : "Connected"}
-                </span>
-              ) : (
-                <Link href="/settings" className="rounded-full bg-[#111014] px-2.5 py-1 text-[10px] font-semibold text-white">
-                  Connect
-                </Link>
-              )}
-            </div>
-          );
-        })}
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <MiniPie
+          title="Sales"
+          value={currency(revenue, data.client.currency)}
+          helper={`${formatNumber(orders)} orders`}
+          segments={salesSegments}
+          emptyLabel="No Shopify sales yet"
+        />
+        <MiniPie
+          title="Sessions"
+          value={formatNumber(sessions)}
+          helper={sessions > 0 ? `${percent(orders / Math.max(sessions, 1), 2)} order rate` : "Connect analytics"}
+          segments={sessionSegments}
+          emptyLabel="No session data yet"
+        />
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <SignalLegend label="Top sales source" segments={salesSegments} emptyLabel="Waiting for Shopify orders" />
+        <SignalLegend label="Top session source" segments={sessionSegments} emptyLabel="Sessions will appear after analytics sync" />
       </div>
     </div>
   );
+}
+
+function MiniPie({ title, value, helper, segments, emptyLabel }: { title: string; value: string; helper: string; segments: PieSegment[]; emptyLabel: string }) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  const background = total > 0 ? pieGradient(segments, total) : "conic-gradient(#eeeaf5 0deg 360deg)";
+
+  return (
+    <div className="rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] p-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8d8799]">{title}</div>
+      <div className="mt-3 grid place-items-center">
+        <div className="relative grid h-24 w-24 place-items-center rounded-full" style={{ background }}>
+          <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-white text-center shadow-inner">
+            <div>
+              <div className="mono text-sm font-bold leading-tight text-[#111014]">{value}</div>
+              <div className="mt-1 text-[9px] font-semibold text-[#6f6b78]">{total > 0 ? helper : emptyLabel}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="mt-3 truncate text-center text-[11px] text-[#6f6b78]">{helper}</p>
+    </div>
+  );
+}
+
+function SignalLegend({ label, segments, emptyLabel }: { label: string; segments: PieSegment[]; emptyLabel: string }) {
+  const top = segments[0];
+  return (
+    <div className="flex items-center gap-2 rounded-2xl bg-[#fbfafc] px-3 py-2">
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: top?.color ?? "#e8e4ef" }} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[#8d8799]">{label}</div>
+        <div className="truncate text-xs font-bold text-[#111014]">{top ? top.label : emptyLabel}</div>
+      </div>
+    </div>
+  );
+}
+
+function buildProductSegments(products: Product[], metric: "revenue30d" | "sessions30d"): PieSegment[] {
+  const colors = ["#059669", "#6d28d9", "#111014", "#a78bfa"];
+  const sorted = [...products]
+    .filter((product) => product[metric] > 0)
+    .sort((a, b) => b[metric] - a[metric]);
+
+  const top = sorted.slice(0, 3).map((product, index) => ({
+    label: product.title,
+    value: product[metric],
+    color: colors[index]
+  }));
+
+  const other = sorted.slice(3).reduce((sum, product) => sum + product[metric], 0);
+  if (other > 0) top.push({ label: "Other products", value: other, color: colors[3] });
+  return top;
+}
+
+function pieGradient(segments: PieSegment[], total: number) {
+  let cursor = 0;
+  const stops = segments.map((segment) => {
+    const start = cursor;
+    const end = cursor + (segment.value / total) * 360;
+    cursor = end;
+    return `${segment.color} ${start}deg ${end}deg`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
 }
 
 function ChannelToggle({ selected, range, data }: { selected: Channel; range: TimeRange; data: DashboardData }) {
@@ -461,11 +538,4 @@ function getChartSeries(channel: Channel, stale: boolean) {
     revenue: series[channel].revenue.map((value, index) => (index > 17 ? value : Math.round(value * 0.72))),
     spend: series[channel].spend.map((value, index) => (index > 17 ? value : Math.round(value * 0.9)))
   };
-}
-
-function integrationColor(type: IntegrationStatus["type"]) {
-  if (type === "shopify") return "bg-emerald-600";
-  if (type === "meta" || type === "google_ads" || type === "neokens" || type === "gemini") return "bg-[#6d28d9]";
-  if (type === "openai" || type === "anthropic") return "bg-[#111014]";
-  return "bg-[#6f6b78]";
 }

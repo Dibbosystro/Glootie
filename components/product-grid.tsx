@@ -10,31 +10,35 @@ export function ProductGrid({ products, recommendations }: { products: Product[]
       {products.map((product) => {
         const rec = recByProduct.get(product.id);
         return (
-          <Link key={product.id} href={`/products/${product.id}`} className="card grid grid-cols-[92px_1fr] gap-4 p-3 hover:border-[#6d28d9]">
-            <img src={product.imageUrl} alt="" className="h-[92px] w-[92px] rounded-md object-cover" />
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h3 className="truncate text-base font-bold text-[#1c1e21]">{product.title}</h3>
-                  <p className="text-xs text-[#65676b]">{product.productType} · {product.inventoryQty} in stock</p>
+          <Link
+            key={product.id}
+            href={`/products/${product.id}`}
+            className="card grid min-w-0 grid-cols-[72px_minmax(0,1fr)] gap-3 p-3 hover:border-[#6d28d9] sm:grid-cols-[92px_minmax(0,1fr)] sm:gap-4"
+          >
+            <img src={product.imageUrl} alt="" className="h-[72px] w-[72px] shrink-0 rounded-md object-cover sm:h-[92px] sm:w-[92px]" />
+            <div className="min-w-0 overflow-hidden">
+              <div className="flex min-w-0 items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="line-clamp-2 max-w-full break-words text-base font-bold leading-snug text-[#1c1e21]">{product.title}</h3>
+                  <p className="mt-0.5 truncate text-xs text-[#65676b]">{product.productType || "Uncategorized"} · {product.inventoryQty} in stock</p>
                 </div>
                 {rec && <RecommendationPill state={rec.state} />}
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                <div>
+                <div className="min-w-0">
                   <div className="text-[#65676b]">Price</div>
-                  <div className="mono font-bold">{currency(product.price)}</div>
+                  <div className="mono truncate font-bold">{currency(product.price)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-[#65676b]">Revenue 30d</div>
-                  <div className="mono font-bold">{currency(product.revenue30d)}</div>
+                  <div className="mono truncate font-bold">{currency(product.revenue30d)}</div>
                 </div>
-                <div>
+                <div className="min-w-0">
                   <div className="text-[#65676b]">CVR</div>
-                  <div className="mono font-bold">{percent(product.conversionRate, 2)}</div>
+                  <div className="mono truncate font-bold">{percent(product.conversionRate, 2)}</div>
                 </div>
               </div>
-              {rec && <p className="mt-3 line-clamp-2 text-sm text-[#1c1e21]">{rec.reason}</p>}
+              {rec && <p className="mt-3 line-clamp-2 break-words text-sm leading-5 text-[#1c1e21]">{rec.reason}</p>}
             </div>
           </Link>
         );

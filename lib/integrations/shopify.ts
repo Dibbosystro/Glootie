@@ -2,6 +2,8 @@ import "server-only";
 
 import type { Product } from "@/lib/types";
 import { getServerEnv } from "@/lib/server-env";
+import { persistShopifySnapshot, recordSyncRun } from "@/lib/db/persistence";
+import { seedClient } from "@/lib/seed";
 
 export interface ShopifySyncResult {
   source: "shopify";
@@ -37,72 +39,96 @@ interface ProductSalesSignal {
   revenue30d: number;
 }
 
+export interface ShopifyInsights {
+  revenue30d: number;
+  orders30d: number;
+  unitsSold30d: number;
+  sessions30d: number;
+  conversionRate: number;
+  activeProducts: number;
+  totalProducts: number;
+  totalInventory: number;
+  outOfStockProducts: number;
+}
+
 export async function syncShopify(): Promise<ShopifySyncResult> {
   const shop = getShopifyStoreDomain();
   const token = getShopifyAccessToken();
   if (!shop || !token) {
-    return {
+    const result = {
       source: "shopify",
       status: "demo",
       rowsChanged: 0,
       message: "Shopify credentials are missing, seed product data is being used."
-    };
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
   }
 
   try {
     const { products, ordersRead } = await fetchShopifyProducts();
-    return {
+    const persistence = await persistShopifySnapshot(seedClient, products);
+    const result = {
       source: "shopify",
       status: "success",
       rowsChanged: products.length,
-      message: `Fetched ${products.length} Shopify products${ordersRead ? " with 30-day order signals" : ""}.`
-    };
+      message: `Fetched ${products.length} Shopify products${ordersRead ? " with 30-day order signals" : ""}${persistence.persisted ? " and saved them to the database" : ""}.`
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
   } catch (error) {
-    return {
+    const result = {
       source: "shopify",
       status: "error",
       rowsChanged: 0,
       message: `Shopify sync failed: ${error instanceof Error ? error.message : "Unknown error"}`
-    };
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
   }
 }
 
-export async function fetchShopifyProducts(): Promise<{ products: Product[]; ordersRead: boolean }> {
+export async function fetchShopifyProducts(): Promise<{ products: Product[]; insights: ShopifyInsights; ordersRead: boolean }> {
   const shop = getShopifyStoreDomain();
   const token = getShopifyAccessToken();
-  if (!shop || !token) return { products: [], ordersRead: false };
+  if (!shop || !token) return { products: [], insights: emptyShopifyInsights(), ordersRead: false };
 
   const rawProducts = await fetchAllShopifyPages<ShopifyProductRaw>(
     `https://${shop}/admin/api/2026-01/products.json?limit=250&fields=id,title,handle,vendor,product_type,status,image,variants`
   );
 
-  let salesByProduct = new Map<string, ProductSalesSignal>();
+  let salesResult = { salesByProduct: new Map<string, ProductSalesSignal>(), orders30d: 0 };
   let ordersRead = false;
 
   try {
-    salesByProduct = await fetchProductSalesSignals(shop, token);
+    salesResult = await fetchProductSalesSignals(shop, token);
     ordersRead = true;
   } catch {
     // Product catalog access is enough for the monitor. Order access improves
     // recommendations, but some Shopify tokens may not include read_orders.
   }
 
+  const products = rawProducts.map((product) => mapShopifyProduct(product, salesResult.salesByProduct.get(String(product.id))));
+
   return {
-    products: rawProducts.map((product) => mapShopifyProduct(product, salesByProduct.get(String(product.id)))),
+    products,
+    insights: buildShopifyInsights(products, salesResult.orders30d),
     ordersRead
   };
 }
 
-async function fetchProductSalesSignals(shop: string, token: string): Promise<Map<string, ProductSalesSignal>> {
+async function fetchProductSalesSignals(shop: string, token: string): Promise<{ salesByProduct: Map<string, ProductSalesSignal>; orders30d: number }> {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const orders = await fetchAllShopifyPages<ShopifyOrderRaw>(
     `https://${shop}/admin/api/2026-01/orders.json?limit=250&status=any&created_at_min=${encodeURIComponent(since)}&fields=id,cancelled_at,line_items`,
     token
   );
   const salesByProduct = new Map<string, ProductSalesSignal>();
+  let orders30d = 0;
 
   for (const order of orders) {
     if (order.cancelled_at) continue;
+    orders30d += 1;
     for (const item of order.line_items ?? []) {
       if (!item.product_id) continue;
       const productId = String(item.product_id);
@@ -116,7 +142,7 @@ async function fetchProductSalesSignals(shop: string, token: string): Promise<Ma
     }
   }
 
-  return salesByProduct;
+  return { salesByProduct, orders30d };
 }
 
 async function fetchAllShopifyPages<T>(firstUrl: string, providedToken?: string): Promise<T[]> {
@@ -165,6 +191,39 @@ function mapShopifyProduct(product: ShopifyProductRaw, sales?: ProductSalesSigna
     revenue30d,
     sessions30d: 0,
     conversionRate: unitsSold30d > 0 ? 0.01 : 0
+  };
+}
+
+function buildShopifyInsights(products: Product[], orders30d: number): ShopifyInsights {
+  const revenue30d = products.reduce((sum, product) => sum + product.revenue30d, 0);
+  const unitsSold30d = products.reduce((sum, product) => sum + product.unitsSold30d, 0);
+  const totalInventory = products.reduce((sum, product) => sum + product.inventoryQty, 0);
+  const activeProducts = products.filter((product) => product.status === "active").length;
+  const outOfStockProducts = products.filter((product) => product.inventoryQty <= 0).length;
+  return {
+    revenue30d: Number(revenue30d.toFixed(2)),
+    orders30d,
+    unitsSold30d,
+    sessions30d: 0,
+    conversionRate: 0,
+    activeProducts,
+    totalProducts: products.length,
+    totalInventory,
+    outOfStockProducts
+  };
+}
+
+function emptyShopifyInsights(): ShopifyInsights {
+  return {
+    revenue30d: 0,
+    orders30d: 0,
+    unitsSold30d: 0,
+    sessions30d: 0,
+    conversionRate: 0,
+    activeProducts: 0,
+    totalProducts: 0,
+    totalInventory: 0,
+    outOfStockProducts: 0
   };
 }
 

@@ -2,6 +2,8 @@ import "server-only";
 
 import type { AdCampaign } from "@/lib/types";
 import { getServerEnv } from "@/lib/server-env";
+import { persistAdCampaignSnapshot, recordSyncRun } from "@/lib/db/persistence";
+import { seedClient } from "@/lib/seed";
 
 export interface MetaSyncResult {
   source: "meta";
@@ -39,29 +41,36 @@ export async function syncMetaAds(): Promise<MetaSyncResult> {
   const token = getServerEnv("META_ACCESS_TOKEN");
   const adAccountId = getServerEnv("META_AD_ACCOUNT_ID");
   if (!token || !adAccountId) {
-    return {
+    const result = {
       source: "meta",
       status: "demo",
       rowsChanged: 0,
       message: "Meta credentials are missing, seed ads data is being used."
-    };
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
   }
 
   try {
     const campaigns = await fetchMetaCampaigns();
-    return {
+    const persistence = await persistAdCampaignSnapshot(seedClient, campaigns);
+    const result = {
       source: "meta",
       status: "success",
       rowsChanged: campaigns.length,
-      message: `Fetched ${campaigns.length} Meta campaigns with last 30 days insights.`
-    };
+      message: `Fetched ${campaigns.length} Meta campaigns with last 30 days insights${persistence.persisted ? " and saved them to the database" : ""}.`
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
   } catch (error) {
-    return {
+    const result = {
       source: "meta",
       status: "error",
       rowsChanged: 0,
       message: `Meta sync failed: ${error instanceof Error ? error.message : "Unknown error"}`
-    };
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
   }
 }
 

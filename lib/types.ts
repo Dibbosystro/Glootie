@@ -106,6 +106,17 @@ export interface DashboardData {
   campaigns: AdCampaign[];
   recommendations: Recommendation[];
   syncRuns: SyncRun[];
+  shopifyInsights?: {
+    revenue30d: number;
+    orders30d: number;
+    unitsSold30d: number;
+    sessions30d: number;
+    conversionRate: number;
+    activeProducts: number;
+    totalProducts: number;
+    totalInventory: number;
+    outOfStockProducts: number;
+  };
 }
 
 export interface Kpi {

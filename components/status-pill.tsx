@@ -16,7 +16,7 @@ export function RecommendationPill({ state }: { state: RecommendationState }) {
     fix_first: "Fix first",
     do_not_advertise: "Do not advertise"
   };
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${recommendationClasses[state]}`}>{label[state]}</span>;
+  return <span className={`inline-flex max-w-[128px] shrink-0 justify-center rounded-full px-2.5 py-1 text-center text-xs font-bold leading-tight ${recommendationClasses[state]}`}>{label[state]}</span>;
 }
 
 export function DeliveryPill({ delivery }: { delivery: string }) {
