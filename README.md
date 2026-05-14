@@ -159,8 +159,6 @@ npm run build
 npm run db:push
 ```
 
-## Notes
+## Product Direction
 
-`Ads Overview.html` is kept as a visual reference for the ads-reporting style. It is not the production source.
-
-The local `Replit-project` export is intentionally ignored because it is a large prototype archive, not deployable production source.
+Glootie is built to become one dashboard per client. V1 is private and password-gated. The auth layer is intentionally simple so Clerk or another full auth provider can be added later without rebuilding the product.
