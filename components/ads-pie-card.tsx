@@ -1,7 +1,7 @@
 import type { AdCampaign } from "@/lib/types";
 import { currency, number } from "@/lib/format";
 
-const colors = ["#6d28d9", "#059669", "#111014", "#a78bfa"];
+const colors = ["#b45309", "#059669", "#1c1917", "#fcd34d"];
 
 export function AdsPieCard({
   title,
@@ -21,7 +21,7 @@ export function AdsPieCard({
   const gradient = buildConicGradient(segments, total);
 
   return (
-    <div className="rounded-2xl border border-[#e8e4ef] bg-white p-4">
+    <div className="rounded-2xl border border-[#d6d3d1] bg-white p-4">
       <h3 className="text-sm font-bold">{title}</h3>
       <div className="mt-4 flex items-center gap-4">
         <div className="grid h-28 w-28 shrink-0 place-items-center rounded-full" style={{ background: gradient }}>
@@ -33,8 +33,8 @@ export function AdsPieCard({
           {segments.map((segment) => (
             <div key={segment.label} className="flex items-center gap-2 text-xs">
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: segment.color }} />
-              <span className="min-w-0 flex-1 truncate text-[#4f4a59]">{segment.label}</span>
-              <span className="mono font-semibold text-[#111014]">{formatValue(segment.value, metric)}</span>
+              <span className="min-w-0 flex-1 truncate text-[#44403c]">{segment.label}</span>
+              <span className="mono font-semibold text-[#1c1917]">{formatValue(segment.value, metric)}</span>
             </div>
           ))}
         </div>
@@ -44,7 +44,7 @@ export function AdsPieCard({
 }
 
 function buildConicGradient(segments: Array<{ value: number; color: string }>, total: number) {
-  if (total <= 0) return "conic-gradient(#e8e4ef 0deg 360deg)";
+  if (total <= 0) return "conic-gradient(#d6d3d1 0deg 360deg)";
   let start = 0;
   const stops = segments.map((segment) => {
     const degrees = (segment.value / total) * 360;

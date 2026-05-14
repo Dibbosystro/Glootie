@@ -17,13 +17,13 @@ export default async function MetaAdsPage() {
       <div className="space-y-5">
         <section className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Ads Manager · {data.client.name}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#57534e]">Ads Manager · {data.client.name}</p>
             <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em]">Meta Ads performance</h1>
-            <p className="mt-2 text-sm text-[#65676b]">Last 30 days · Website purchase attribution · client-readable highlights.</p>
+            <p className="mt-2 text-sm text-[#57534e]">Last 30 days · Website purchase attribution · client-readable highlights.</p>
           </div>
           <div className="flex gap-2">
-            <span className="rounded-full bg-[#f2ecff] px-3 py-2 text-xs font-bold text-[#6d28d9]">Last 30 days</span>
-            <span className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#65676b]">All campaigns</span>
+            <span className="rounded-full bg-[#fef3c7] px-3 py-2 text-xs font-bold text-[#b45309]">Last 30 days</span>
+            <span className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#57534e]">All campaigns</span>
           </div>
         </section>
 
@@ -34,20 +34,20 @@ export default async function MetaAdsPage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold">Daily spend and purchase signal</h2>
-                <p className="text-sm text-[#65676b]">Daily pacing plus campaign-level pie charts. Live API sync will replace this with daily rows.</p>
+                <p className="text-sm text-[#57534e]">Daily pacing plus campaign-level pie charts. Live API sync will replace this with daily rows.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
               <div>
-                <div className="flex h-[240px] items-end gap-1 border-b border-l border-[#e8e4ef] px-3 pb-3">
+                <div className="flex h-[240px] items-end gap-1 border-b border-l border-[#d6d3d1] px-3 pb-3">
                   {Array.from({ length: 30 }).map((_, index) => {
                     const height = 34 + ((index * 17) % 54);
                     const purchase = index % 2 === 1 || index === 26;
-                    return <div key={index} title={`Day ${index + 1}`} className={`flex-1 rounded-t-sm ${purchase ? "bg-[#31a24c]" : "bg-[#6d28d9]"}`} style={{ height: `${height}%` }} />;
+                    return <div key={index} title={`Day ${index + 1}`} className={`flex-1 rounded-t-sm ${purchase ? "bg-[#31a24c]" : "bg-[#b45309]"}`} style={{ height: `${height}%` }} />;
                   })}
                 </div>
-                <div className="mt-3 flex items-center gap-4 text-xs text-[#65676b]">
-                  <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#6d28d9]" /> Spend day</span>
+                <div className="mt-3 flex items-center gap-4 text-xs text-[#57534e]">
+                  <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#b45309]" /> Spend day</span>
                   <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#31a24c]" /> Purchase day</span>
                   <span className="ml-auto">Total: {currency(totalSpend)} spent · {currency(totalRevenue)} revenue</span>
                 </div>
@@ -74,7 +74,7 @@ export default async function MetaAdsPage() {
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold">Campaigns</h2>
-              <p className="text-sm text-[#65676b]">{number(campaigns.length)} campaigns in this view</p>
+              <p className="text-sm text-[#57534e]">{number(campaigns.length)} campaigns in this view</p>
             </div>
           </div>
           <AdsTable campaigns={campaigns} products={data.products} />
@@ -86,9 +86,9 @@ export default async function MetaAdsPage() {
 
 function Highlight({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-md border border-[#e4e6eb] p-4">
+    <div className="rounded-md border border-[#d6d3d1] p-4">
       <div className="font-bold">{title}</div>
-      <p className="mt-1 text-sm text-[#65676b]">{body}</p>
+      <p className="mt-1 text-sm text-[#57534e]">{body}</p>
     </div>
   );
 }

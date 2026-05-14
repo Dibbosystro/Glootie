@@ -252,7 +252,7 @@ async function getShopifyAccessToken() {
 }
 
 function fallbackProductImage(title: string) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><rect width="240" height="240" fill="#f8f7fb"/><circle cx="120" cy="120" r="72" fill="#6d28d9" opacity=".16"/><text x="120" y="126" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#111014">${escapeSvg(title.slice(0, 2).toUpperCase())}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><rect width="240" height="240" fill="#f5f5f4"/><circle cx="120" cy="120" r="72" fill="#b45309" opacity=".16"/><text x="120" y="126" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#1c1917">${escapeSvg(title.slice(0, 2).toUpperCase())}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 

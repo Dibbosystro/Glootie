@@ -20,13 +20,13 @@ export function CampaignCategorySummary({ campaigns, products }: { campaigns: Ad
   return (
     <div className="card p-5">
       <h2 className="text-lg font-bold">Campaign categories</h2>
-      <p className="mt-1 text-sm text-[#65676b]">Campaigns are grouped by offer/intent first, then linked to products only when there is a reliable match.</p>
+      <p className="mt-1 text-sm text-[#57534e]">Campaigns are grouped by offer/intent first, then linked to products only when there is a reliable match.</p>
       <div className="mt-4 space-y-2">
         {rows.map((row) => (
-          <div key={row.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-2xl border border-[#e8e4ef] bg-white p-3 text-sm">
+          <div key={row.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded-2xl border border-[#d6d3d1] bg-white p-3 text-sm">
             <div>
               <div className="font-bold">{row.label}</div>
-              <div className="text-xs text-[#6f6b78]">{number(row.campaigns)} campaigns</div>
+              <div className="text-xs text-[#57534e]">{number(row.campaigns)} campaigns</div>
             </div>
             <div className="mono text-right font-semibold">{currency(row.spend)}</div>
             <div className="mono text-right font-semibold text-emerald-700">{number(row.purchases)} purchases</div>

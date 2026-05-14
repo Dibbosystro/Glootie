@@ -17,13 +17,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell data={data}>
       <div className="space-y-5">
-        <Link href="/products" className="text-sm font-bold text-[#6d28d9]">Back to products</Link>
+        <Link href="/products" className="text-sm font-bold text-[#b45309]">Back to products</Link>
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
           <div className="card overflow-hidden">
             <img src={product.imageUrl} alt="" className="h-[280px] w-full object-cover" />
             <div className="p-5">
               <h1 className="text-2xl font-bold">{product.title}</h1>
-              <p className="mt-1 text-sm text-[#65676b]">{product.productType} · {product.vendor}</p>
+              <p className="mt-1 text-sm text-[#57534e]">{product.productType} · {product.vendor}</p>
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <Fact label="Price" value={currency(product.price)} />
                 <Fact label="Inventory" value={`${product.inventoryQty} units`} />
@@ -37,18 +37,18 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <div className="card p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Recommendation</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#57534e]">Recommendation</p>
                     <h2 className="mt-1 text-2xl font-bold">{recommendation.headline}</h2>
                   </div>
                   <RecommendationPill state={recommendation.state} />
                 </div>
-                <p className="mt-3 text-[#1c1e21]">{recommendation.reason}</p>
-                <div className="mt-4 rounded-md bg-[#f7f3ff] p-4">
+                <p className="mt-3 text-[#1c1917]">{recommendation.reason}</p>
+                <div className="mt-4 rounded-md bg-[#fef3c7] p-4">
                   <div className="text-sm font-bold">Next action</div>
-                  <p className="mt-1 text-sm text-[#65676b]">{recommendation.nextAction}</p>
+                  <p className="mt-1 text-sm text-[#57534e]">{recommendation.nextAction}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {recommendation.signals.map((signal) => <span key={signal} className="rounded-full bg-[#f2ecff] px-3 py-1 text-xs font-bold text-[#6d28d9]">{signal}</span>)}
+                  {recommendation.signals.map((signal) => <span key={signal} className="rounded-full bg-[#fef3c7] px-3 py-1 text-xs font-bold text-[#b45309]">{signal}</span>)}
                 </div>
               </div>
             )}
@@ -71,7 +71,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-xs text-[#65676b]">{label}</div>
+      <div className="text-xs text-[#57534e]">{label}</div>
       <div className="mono mt-1 font-bold">{value}</div>
     </div>
   );
@@ -80,7 +80,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 function FactCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="card p-4">
-      <div className="text-xs text-[#65676b]">{label}</div>
+      <div className="text-xs text-[#57534e]">{label}</div>
       <div className="mono mt-2 text-xl font-bold">{value}</div>
     </div>
   );

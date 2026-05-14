@@ -16,9 +16,9 @@ export default async function ProductsPage() {
     <AppShell data={data}>
       <div className="space-y-5">
         <section>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Shopify monitor</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#57534e]">Shopify monitor</p>
           <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em]">Shopify</h1>
-          <p className="mt-2 max-w-3xl text-sm text-[#65676b]">
+          <p className="mt-2 max-w-3xl text-sm text-[#57534e]">
             Store sales, order signal, inventory health, and product readiness for the next ads cycle.
           </p>
         </section>
@@ -39,9 +39,9 @@ export default async function ProductsPage() {
           <div className="mb-3 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-lg font-bold">Products</h2>
-              <p className="text-sm text-[#65676b]">Ranked by Shopify sales signal, stock, and ad readiness.</p>
+              <p className="text-sm text-[#57534e]">Ranked by Shopify sales signal, stock, and ad readiness.</p>
             </div>
-            <span className="text-xs font-semibold text-[#6d28d9]">{number(data.products.length)} products loaded</span>
+            <span className="text-xs font-semibold text-[#b45309]">{number(data.products.length)} products loaded</span>
           </div>
           <ProductGrid products={data.products} recommendations={data.recommendations} />
         </section>
@@ -92,9 +92,9 @@ function getShopifyKpis(insights = {
 function InsightCard({ label, value, helper }: { label: string; value: string; helper: string }) {
   return (
     <div className="card p-5">
-      <div className="text-xs font-semibold text-[#6f6b78]">{label}</div>
-      <div className="mono mt-2 text-2xl font-bold tracking-[-0.02em] text-[#111014]">{value}</div>
-      <div className="mt-2 text-xs font-semibold text-[#6d28d9]">{helper}</div>
+      <div className="text-xs font-semibold text-[#57534e]">{label}</div>
+      <div className="mono mt-2 text-2xl font-bold tracking-[-0.02em] text-[#1c1917]">{value}</div>
+      <div className="mt-2 text-xs font-semibold text-[#b45309]">{helper}</div>
     </div>
   );
 }

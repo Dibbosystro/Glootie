@@ -3,6 +3,7 @@ import { AlertTriangle, Check, ChevronRight, PauseCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { MetricStrip } from "@/components/metric-strip";
 import { RecommendationPill } from "@/components/status-pill";
+import { SpendTreemap } from "@/components/spend-treemap";
 import { SyncButton } from "@/components/sync-button";
 import { getDashboardData, getOverviewKpis } from "@/lib/data";
 import { currency, number as formatNumber, percent, roas } from "@/lib/format";
@@ -34,8 +35,9 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
       <div className="space-y-4">
         <section className="flex flex-col gap-3 pt-1 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.03em] text-[#111014]">Performance overview</h1>
-            <p className="mt-1 text-sm text-[#6f6b78]">Here is what is selling, spending, and ready for ads today.</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#78716c]">{data.client.name}</p>
+            <h1 className="mt-1 text-[28px] font-bold leading-tight tracking-[-0.03em] text-[#1c1917]">Performance overview</h1>
+            <p className="mt-1 text-sm text-[#57534e]">Here is what is selling, spending, and ready for ads today.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ChannelToggle selected={channel} data={data} />
@@ -45,30 +47,47 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
 
         <MetricStrip kpis={kpis} />
 
+        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SpendTreemap
+            campaigns={channelView.campaigns}
+            metric="spend"
+            title="Where the money is going"
+            subtitle="Top campaigns by 30-day spend. Colour = ROAS tier."
+            href={channel === "google" ? "/ads/google" : channel === "meta" ? "/ads/meta" : "/ads/meta"}
+          />
+          <SpendTreemap
+            campaigns={channelView.campaigns}
+            metric="revenue"
+            title="Where the money is coming back"
+            subtitle="Top campaigns by 30-day attributed revenue."
+            href={channel === "google" ? "/ads/google" : channel === "meta" ? "/ads/meta" : "/ads/meta"}
+          />
+        </section>
+
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             <div className="card p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] text-[#6f6b78]">{channelView.title}</span>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${channelView.stale ? "bg-[#f2ecff] text-[#6d28d9]" : "bg-emerald-50 text-emerald-700"}`}>
+                    <span className="text-[11px] text-[#57534e]">{channelView.title}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${channelView.stale ? "bg-[#fef3c7] text-[#b45309]" : "bg-emerald-50 text-emerald-700"}`}>
                       {channelView.stale ? "Stale view" : "Live view"}
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-baseline gap-2">
-                    <div className="mono text-[28px] font-bold tracking-[-0.03em] text-[#111014]">{currency(revenue, data.client.currency)}</div>
+                    <div className="mono text-[28px] font-bold tracking-[-0.03em] text-[#1c1917]">{currency(revenue, data.client.currency)}</div>
                     <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">{roas(revenue / Math.max(spend, 1))}</span>
-                    <span className="text-[11px] text-[#8d8799]">with {currency(spend, data.client.currency)} ad spend · {channelView.helper}</span>
+                    <span className="text-[11px] text-[#78716c]">with {currency(spend, data.client.currency)} ad spend · {channelView.helper}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 text-[11px] text-[#6f6b78]">
+                <div className="flex items-center gap-3 text-[11px] text-[#57534e]">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-600" />
                     Revenue
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-[#6d28d9]" />
+                    <span className="h-2 w-2 rounded-full bg-[#b45309]" />
                     Ad spend
                   </span>
                 </div>
@@ -81,10 +100,11 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
             <div className="card p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-bold">Top products</h2>
-                  <p className="text-[11px] text-[#6f6b78]">By product signal · last 30 days</p>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#78716c]">Top products</div>
+                  <h2 className="mt-1 text-base font-bold text-[#1c1917]">By product signal</h2>
+                  <p className="text-[11px] text-[#78716c]">Last 30 days</p>
                 </div>
-                <Link href="/products" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6f6b78]">
+                <Link href="/products" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#57534e]">
                   View all
                   <ChevronRight className="h-3 w-3" />
                 </Link>
@@ -101,8 +121,11 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
             <ShopifySalesSessionCard data={data} />
             <div className="card p-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold">Needs attention</h2>
-                <span className="text-[10px] text-[#8d8799]">{blockedRecs.length + profitablePaused.length} items</span>
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#78716c]">Needs attention</div>
+                  <h2 className="mt-1 text-base font-bold text-[#1c1917]">Open items</h2>
+                </div>
+                <span className="mono rounded-full bg-[#fef3c7] px-2 py-0.5 text-[11px] font-bold text-[#b45309]">{blockedRecs.length + profitablePaused.length}</span>
               </div>
               <div className="mt-4 space-y-2.5">
                 <AttentionItem
@@ -133,9 +156,9 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold">Ad opportunities</h2>
-                <p className="text-[11px] text-[#6f6b78]">Clear product moves for the next ads cycle.</p>
+                <p className="text-[11px] text-[#57534e]">Clear product moves for the next ads cycle.</p>
               </div>
-              <Link href="/opportunities" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6f6b78]">
+              <Link href="/opportunities" className="inline-flex items-center gap-1 text-[11px] font-medium text-[#57534e]">
                 Open
                 <ChevronRight className="h-3 w-3" />
               </Link>
@@ -156,13 +179,13 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
                 const sourceRevenue = campaigns.reduce((sum, campaign) => sum + campaign.revenue30d, 0);
                 const href = source === "meta" ? "/ads/meta" : "/ads/google";
                 return (
-                  <Link key={source} href={href} className="flex items-center gap-3 rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] px-3 py-3 hover:border-[#cbbcf6] hover:bg-[#f7f3ff]">
-                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#6d28d9] text-xs font-black text-white">
+                  <Link key={source} href={href} className="flex items-center gap-3 rounded-2xl border border-[#e7e5e4] bg-[#fafaf9] px-3 py-3 hover:border-[#fbbf24] hover:bg-[#fef3c7]">
+                    <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#b45309] text-xs font-black text-white">
                       {source === "meta" ? "M" : "G"}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold">{source === "meta" ? "Meta Ads" : "Google Ads"}</div>
-                      <div className="text-[11px] text-[#6f6b78]">{currency(sourceSpend, data.client.currency)} spent</div>
+                      <div className="text-[11px] text-[#57534e]">{currency(sourceSpend, data.client.currency)} spent</div>
                     </div>
                     <div className="mono text-sm font-bold text-emerald-700">{roas(sourceRevenue / Math.max(sourceSpend, 1))}</div>
                   </Link>
@@ -189,9 +212,9 @@ function ShopifySalesSessionCard({ data }: { data: DashboardData }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold">Shopify signal</h2>
-          <p className="text-[11px] text-[#6f6b78]">Sales and sessions, last 30 days</p>
+          <p className="text-[11px] text-[#57534e]">Sales and sessions, last 30 days</p>
         </div>
-        <Link href="/products" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6d28d9]">
+        <Link href="/products" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#b45309]">
           Open
           <ChevronRight className="h-3 w-3" />
         </Link>
@@ -226,21 +249,21 @@ function ShopifySalesSessionCard({ data }: { data: DashboardData }) {
 
 function MiniPie({ title, value, helper, segments, emptyValue, emptyLabel }: { title: string; value: string; helper: string; segments: PieSegment[]; emptyValue: string; emptyLabel: string }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-  const background = total > 0 ? pieGradient(segments, total) : "conic-gradient(#eeeaf5 0deg 360deg)";
+  const background = total > 0 ? pieGradient(segments, total) : "conic-gradient(#e7e5e4 0deg 360deg)";
   const displayValue = total > 0 ? value : emptyValue;
   const caption = total > 0 ? helper : emptyLabel;
 
   return (
-    <div className="rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] p-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8d8799]">{title}</div>
+    <div className="rounded-2xl border border-[#e7e5e4] bg-[#fafaf9] p-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#78716c]">{title}</div>
       <div className="mt-3 grid place-items-center">
         <div className="relative grid h-24 w-24 place-items-center rounded-full" style={{ background }}>
           <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-white text-center shadow-inner">
-            <div className="mono text-sm font-bold leading-tight text-[#111014]">{displayValue}</div>
+            <div className="mono text-sm font-bold leading-tight text-[#1c1917]">{displayValue}</div>
           </div>
         </div>
       </div>
-      <p className="mt-3 truncate text-center text-[11px] font-medium text-[#6f6b78]">{caption}</p>
+      <p className="mt-3 truncate text-center text-[11px] font-medium text-[#57534e]">{caption}</p>
     </div>
   );
 }
@@ -248,18 +271,18 @@ function MiniPie({ title, value, helper, segments, emptyValue, emptyLabel }: { t
 function SignalLegend({ label, segments, emptyLabel }: { label: string; segments: PieSegment[]; emptyLabel: string }) {
   const top = segments[0];
   return (
-    <div className="flex items-center gap-2 rounded-2xl bg-[#fbfafc] px-3 py-2">
-      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: top?.color ?? "#e8e4ef" }} />
+    <div className="flex items-center gap-2 rounded-2xl bg-[#fafaf9] px-3 py-2">
+      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: top?.color ?? "#d6d3d1" }} />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-[#8d8799]">{label}</div>
-        <div className="truncate text-xs font-bold text-[#111014]">{top ? top.label : emptyLabel}</div>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-[#78716c]">{label}</div>
+        <div className="truncate text-xs font-bold text-[#1c1917]">{top ? top.label : emptyLabel}</div>
       </div>
     </div>
   );
 }
 
 function buildProductSegments(products: Product[], metric: "revenue30d" | "sessions30d"): PieSegment[] {
-  const colors = ["#059669", "#6d28d9", "#111014", "#a78bfa"];
+  const colors = ["#059669", "#b45309", "#1c1917", "#fcd34d"];
   const sorted = [...products]
     .filter((product) => product[metric] > 0)
     .sort((a, b) => b[metric] - a[metric]);
@@ -294,7 +317,7 @@ function ChannelToggle({ selected, data }: { selected: Channel; data: DashboardD
   ];
 
   return (
-    <div className="inline-flex rounded-full border border-[#e8e4ef] bg-white p-0.5 text-xs shadow-sm">
+    <div className="inline-flex rounded-full border border-[#d6d3d1] bg-white p-0.5 text-xs shadow-sm">
       {options.map((option) => {
         const active = selected === option.channel;
         const stale = getChannelView(data, option.channel).stale;
@@ -303,7 +326,7 @@ function ChannelToggle({ selected, data }: { selected: Channel; data: DashboardD
             key={option.channel}
             href={option.href}
             className={`rounded-full px-3 py-1.5 font-semibold transition ${
-              active ? "bg-[#111014] text-white" : stale ? "text-[#6d28d9] hover:bg-[#f2ecff]" : "text-[#6f6b78] hover:bg-[#f1eef8]"
+              active ? "bg-[#1c1917] text-white" : stale ? "text-[#b45309] hover:bg-[#fef3c7]" : "text-[#57534e] hover:bg-[#f5f5f4]"
             }`}
             title={stale ? `${option.label} is showing stale/demo data` : `${option.label} is connected`}
           >
@@ -318,32 +341,32 @@ function ChannelToggle({ selected, data }: { selected: Channel; data: DashboardD
 function AttentionItem({ icon, title, body, tone }: { icon: React.ReactNode; title: string; body: string; tone: "good" | "warn" | "bad" }) {
   const toneClass = {
     good: "bg-emerald-50 text-emerald-700",
-    warn: "bg-[#f2ecff] text-[#6d28d9]",
-    bad: "bg-[#f2ecff] text-[#6d28d9]"
+    warn: "bg-[#fef3c7] text-[#b45309]",
+    bad: "bg-[#fef3c7] text-[#b45309]"
   };
   return (
-    <div className="flex gap-3 rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] p-3">
+    <div className="flex gap-3 rounded-2xl border border-[#e7e5e4] bg-[#fafaf9] p-3">
       <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${toneClass[tone]}`}>{icon}</div>
       <div className="min-w-0">
         <div className="truncate text-sm font-bold">{title}</div>
-        <p className="mt-1 text-xs leading-5 text-[#6f6b78]">{body}</p>
+        <p className="mt-1 text-xs leading-5 text-[#57534e]">{body}</p>
       </div>
     </div>
   );
 }
 
 function TopProductRow({ product, index, maxRevenue }: { product: Product; index: number; maxRevenue: number }) {
-  const colors = ["bg-[#6d28d9]", "bg-emerald-500", "bg-[#111014]", "bg-[#a78bfa]"];
+  const colors = ["bg-[#b45309]", "bg-emerald-500", "bg-[#1c1917]", "bg-[#fcd34d]"];
   const width = Math.max(8, Math.round((product.revenue30d / maxRevenue) * 100));
   return (
-    <Link href={`/products/${product.id}`} className="flex items-center gap-3 rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] px-3 py-2.5 hover:border-[#cbbcf6] hover:bg-[#f7f3ff]">
+    <Link href={`/products/${product.id}`} className="flex items-center gap-3 rounded-2xl border border-[#e7e5e4] bg-[#fafaf9] px-3 py-2.5 hover:border-[#fbbf24] hover:bg-[#fef3c7]">
       <div className={`h-10 w-10 shrink-0 rounded-full ${colors[index % colors.length]}`} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-[#111014]">{product.title}</div>
-        <div className="text-[11px] text-[#6f6b78]">{product.unitsSold30d} sold · {product.inventoryQty} in stock · {percent(product.conversionRate, 2)} CVR</div>
+        <div className="truncate text-sm font-semibold text-[#1c1917]">{product.title}</div>
+        <div className="text-[11px] text-[#57534e]">{product.unitsSold30d} sold · {product.inventoryQty} in stock · {percent(product.conversionRate, 2)} CVR</div>
       </div>
-      <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-[#e8e4ef] sm:block">
-        <div className="h-full rounded-full bg-[#111014]" style={{ width: `${width}%` }} />
+      <div className="hidden h-1.5 w-32 overflow-hidden rounded-full bg-[#d6d3d1] sm:block">
+        <div className="h-full rounded-full bg-[#1c1917]" style={{ width: `${width}%` }} />
       </div>
       <div className="mono w-20 text-right text-sm font-bold">{currency(product.revenue30d)}</div>
     </Link>
@@ -353,17 +376,17 @@ function TopProductRow({ product, index, maxRevenue }: { product: Product; index
 function OpportunityCard({ recommendation, product }: { recommendation: Recommendation; product?: Product }) {
   if (!product) return null;
   return (
-    <Link href={`/products/${product.id}`} className="grid grid-cols-[92px_1fr] gap-4 rounded-2xl border border-[#eeeaf5] bg-[#fbfafc] p-3 hover:border-[#cbbcf6] hover:bg-[#f7f3ff]">
+    <Link href={`/products/${product.id}`} className="grid grid-cols-[92px_1fr] gap-4 rounded-2xl border border-[#e7e5e4] bg-[#fafaf9] p-3 hover:border-[#fbbf24] hover:bg-[#fef3c7]">
       <img src={product.imageUrl} alt="" className="h-[92px] w-[92px] rounded-xl object-cover" />
       <div className="min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="truncate text-base font-bold">{product.title}</h3>
-            <p className="text-xs text-[#6f6b78]">{product.productType} · {product.inventoryQty} in stock</p>
+            <p className="text-xs text-[#57534e]">{product.productType} · {product.inventoryQty} in stock</p>
           </div>
           <RecommendationPill state={recommendation.state} />
         </div>
-        <p className="mt-3 line-clamp-2 text-sm leading-5 text-[#4f4a59]">{recommendation.reason}</p>
+        <p className="mt-3 line-clamp-2 text-sm leading-5 text-[#44403c]">{recommendation.reason}</p>
       </div>
     </Link>
   );
@@ -400,20 +423,20 @@ function AdsSalesChart({ channel, stale }: { channel: Channel; stale: boolean })
             <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
           </linearGradient>
           <linearGradient id="overview-spend" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#6d28d9" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#6d28d9" stopOpacity="0" />
+            <stop offset="0%" stopColor="#b45309" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[0, 1, 2, 3, 4].map((index) => (
-          <line key={index} x1="0" x2={width} y1={24 + index * 42} y2={24 + index * 42} stroke="#e8e4ef" strokeDasharray="3 7" />
+          <line key={index} x1="0" x2={width} y1={24 + index * 42} y2={24 + index * 42} stroke="#d6d3d1" strokeDasharray="3 7" />
         ))}
         <path d={`${revenuePath} L${width},${height} L0,${height} Z`} fill="url(#overview-revenue)" />
         <path d={`${spendPath} L${width},${height} L0,${height} Z`} fill="url(#overview-spend)" />
         <path d={revenuePath} fill="none" stroke="#059669" strokeLinecap="round" strokeWidth="2.5" />
-        <path d={spendPath} fill="none" stroke="#6d28d9" strokeLinecap="round" strokeWidth="2.5" />
+        <path d={spendPath} fill="none" stroke="#b45309" strokeLinecap="round" strokeWidth="2.5" />
         <circle cx="617" cy="62" r="4" fill="#059669" stroke="white" strokeWidth="2" />
       </svg>
-      <div className="-mt-2 flex justify-between px-2 text-[10px] text-[#8d8799]">
+      <div className="-mt-2 flex justify-between px-2 text-[10px] text-[#78716c]">
         {["15 Apr", "17 Apr", "19 Apr", "21 Apr", "23 Apr", "25 Apr", "27 Apr", "29 Apr", "1 May", "3 May", "5 May", "7 May"].map((label) => (
           <span key={label}>{label}</span>
         ))}

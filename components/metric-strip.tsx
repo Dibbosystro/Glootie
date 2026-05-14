@@ -3,9 +3,9 @@ import type { Kpi } from "@/lib/types";
 
 const toneClass: Record<Kpi["tone"], { text: string; bg: string; line: string; up: boolean }> = {
   good: { text: "text-emerald-700", bg: "bg-emerald-50", line: "bg-emerald-500", up: true },
-  warn: { text: "text-[#6d28d9]", bg: "bg-[#f2ecff]", line: "bg-[#6d28d9]", up: false },
-  bad: { text: "text-[#6d28d9]", bg: "bg-[#f2ecff]", line: "bg-[#6d28d9]", up: false },
-  neutral: { text: "text-[#6d28d9]", bg: "bg-[#f2ecff]", line: "bg-[#6d28d9]", up: true }
+  warn: { text: "text-[#b45309]", bg: "bg-[#fef3c7]", line: "bg-[#b45309]", up: false },
+  bad: { text: "text-[#b45309]", bg: "bg-[#fef3c7]", line: "bg-[#b45309]", up: false },
+  neutral: { text: "text-[#b45309]", bg: "bg-[#fef3c7]", line: "bg-[#b45309]", up: true }
 };
 
 const sparkData = [
@@ -23,7 +23,7 @@ export function MetricStrip({ kpis }: { kpis: Kpi[] }) {
         const Icon = tone.up ? ArrowUpRight : ArrowDownRight;
         return (
           <div key={kpi.label} className="metric-cell flex flex-col">
-            <div className="text-[11px] font-medium text-[#6f6b78]">{kpi.label}</div>
+            <div className="text-[11px] font-medium text-[#57534e]">{kpi.label}</div>
             <div className="mt-2 flex items-start justify-between gap-3">
               <div className="mono text-[26px] font-bold leading-none tracking-[-0.02em] text-stone-950">{kpi.value}</div>
               <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${tone.bg} ${tone.text}`}>
@@ -58,7 +58,7 @@ function Sparkline({ values, positive }: { values: number[]; positive: boolean }
     .join(" ");
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-7 w-20 overflow-visible">
-      <path d={path} fill="none" stroke={positive ? "#059669" : "#6d28d9"} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+      <path d={path} fill="none" stroke={positive ? "#059669" : "#b45309"} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
     </svg>
   );
 }

@@ -23,11 +23,11 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     <AppShell data={data}>
       <div className="space-y-5">
         <section>
-          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Admin</p>
+          <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#57534e]">Admin</p>
           <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em]">Settings</h1>
-          <p className="mt-2 max-w-3xl text-sm text-[#65676b]">Check live integrations, run manual syncs, and see which AI provider keys are configured.</p>
+          <p className="mt-2 max-w-3xl text-sm text-[#57534e]">Check live integrations, run manual syncs, and see which AI provider keys are configured.</p>
           {oauthMessage ? (
-            <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${oauthMessage.tone === "good" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-[#ddd3f8] bg-[#f2ecff] text-[#6d28d9]"}`}>
+            <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-semibold ${oauthMessage.tone === "good" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-[#fde68a] bg-[#fef3c7] text-[#b45309]"}`}>
               {oauthMessage.text}
             </div>
           ) : null}
@@ -35,7 +35,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
 
         <section className="card p-5">
           <h2 className="text-lg font-bold">Manual sync</h2>
-          <p className="mt-1 text-sm text-[#65676b]">Vercel Cron calls `/api/sync/all` daily using `CRON_SECRET`. These buttons use your private app session.</p>
+          <p className="mt-1 text-sm text-[#57534e]">Vercel Cron calls `/api/sync/all` daily using `CRON_SECRET`. These buttons use your private app session.</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <SyncButton source="all" label="Sync all" />
             <SyncButton source="shopify" label="Sync Shopify" />
@@ -47,13 +47,13 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="card p-5">
             <h2 className="text-lg font-bold">Data integrations</h2>
-            <p className="mt-1 text-sm text-[#65676b]">Add, replace, or remove the app-local API keys used for live product and ads sync.</p>
+            <p className="mt-1 text-sm text-[#57534e]">Add, replace, or remove the app-local API keys used for live product and ads sync.</p>
             <ApiSettingsList integrations={dataApiSettings} />
           </div>
 
           <div className="card p-5">
             <h2 className="text-lg font-bold">AI providers</h2>
-            <p className="mt-1 text-sm text-[#65676b]">Secrets stay server-side. The browser can add or remove keys, but never reads saved values.</p>
+            <p className="mt-1 text-sm text-[#57534e]">Secrets stay server-side. The browser can add or remove keys, but never reads saved values.</p>
             <ApiSettingsList integrations={aiApiSettings} />
           </div>
         </section>

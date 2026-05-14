@@ -45,9 +45,9 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
         <section className="space-y-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Online products</p>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#57534e]">Online products</p>
               <h1 className="mt-1 text-3xl font-bold tracking-[-0.03em]">What should we advertise next?</h1>
-              <p className="mt-2 max-w-3xl text-sm text-[#65676b]">Active products with a verdict. Filter by verdict, sort by readiness, revenue, or name.</p>
+              <p className="mt-2 max-w-3xl text-sm text-[#57534e]">Active products with a verdict. Filter by verdict, sort by readiness, revenue, or name.</p>
             </div>
             <SortToggle selected={sort} verdict={verdict} />
           </div>
@@ -56,30 +56,30 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
 
           <div className="space-y-2">
             {onlineSorted.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-[#65676b]">No online products match this verdict.</div>
+              <div className="card p-6 text-center text-sm text-[#57534e]">No online products match this verdict.</div>
             ) : (
               onlineSorted.map(({ rec, product }) => (
                 <Link
                   key={rec.id}
                   href={`/products/${product.id}`}
-                  className="card flex items-center gap-4 p-3 transition hover:border-[#cbbcf6] hover:bg-[#fbfaff]"
+                  className="card flex items-center gap-4 p-3 transition hover:border-[#fbbf24] hover:bg-[#fffbeb]"
                 >
                   <img src={product.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-sm font-bold text-[#111014]">{product.title}</h2>
+                      <h2 className="truncate text-sm font-bold text-[#1c1917]">{product.title}</h2>
                       <RecommendationPill state={rec.state} />
                     </div>
-                    <p className="mt-1 line-clamp-1 text-xs text-[#65676b]">{rec.reason}</p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#8d8799]">
+                    <p className="mt-1 line-clamp-1 text-xs text-[#57534e]">{rec.reason}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#78716c]">
                       <span>{number(product.inventoryQty)} in stock</span>
                       <span>{currency(product.revenue30d)} 30d revenue</span>
                       <span>{number(product.unitsSold30d)} units sold</span>
                     </div>
                   </div>
                   <div className="hidden flex-col items-end text-right sm:flex">
-                    <div className="mono text-xl font-bold text-[#6d28d9]">{rec.score}</div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8d8799]">readiness</div>
+                    <div className="mono text-xl font-bold text-[#b45309]">{rec.score}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#78716c]">readiness</div>
                   </div>
                 </Link>
               ))
@@ -90,31 +90,31 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#65676b]">Drafts</p>
+              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[#57534e]">Drafts</p>
               <h2 className="mt-1 text-xl font-bold tracking-[-0.02em]">Draft products in Shopify</h2>
-              <p className="mt-1 max-w-3xl text-sm text-[#65676b]">Not yet published. Excluded from ad recommendations until they go live.</p>
+              <p className="mt-1 max-w-3xl text-sm text-[#57534e]">Not yet published. Excluded from ad recommendations until they go live.</p>
             </div>
-            <span className="mono rounded-full bg-[#ebe8f1] px-3 py-1 text-xs font-bold text-[#4a4658]">{draftProducts.length}</span>
+            <span className="mono rounded-full bg-[#e7e5e4] px-3 py-1 text-xs font-bold text-[#44403c]">{draftProducts.length}</span>
           </div>
 
           <div className="space-y-2">
             {draftProducts.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-[#65676b]">No draft products in Shopify.</div>
+              <div className="card p-6 text-center text-sm text-[#57534e]">No draft products in Shopify.</div>
             ) : (
               draftProducts.map((product) => (
                 <Link
                   key={product.id}
                   href={`/products/${product.id}`}
-                  className="card flex items-center gap-4 p-3 transition hover:border-[#cbbcf6] hover:bg-[#fbfaff]"
+                  className="card flex items-center gap-4 p-3 transition hover:border-[#fbbf24] hover:bg-[#fffbeb]"
                 >
                   <img src={product.imageUrl} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-sm font-bold text-[#111014]">{product.title}</h3>
-                      <span className="inline-flex shrink-0 justify-center rounded-full bg-[#ebe8f1] px-2.5 py-1 text-xs font-bold text-[#4a4658]">Draft</span>
+                      <h3 className="truncate text-sm font-bold text-[#1c1917]">{product.title}</h3>
+                      <span className="inline-flex shrink-0 justify-center rounded-full bg-[#e7e5e4] px-2.5 py-1 text-xs font-bold text-[#44403c]">Draft</span>
                     </div>
-                    <p className="mt-1 line-clamp-1 text-xs text-[#65676b]">{product.productType || "Uncategorised"} · {product.vendor || "No vendor"}</p>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#8d8799]">
+                    <p className="mt-1 line-clamp-1 text-xs text-[#57534e]">{product.productType || "Uncategorised"} · {product.vendor || "No vendor"}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[#78716c]">
                       <span>{number(product.inventoryQty)} in stock</span>
                       <span>{currency(product.price)} price</span>
                     </div>
@@ -141,11 +141,11 @@ function VerdictFilter({ selected, counts, total, sort }: { selected: Verdict; c
             key={option}
             href={opportunitiesHref(option, sort)}
             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              active ? "border-[#111014] bg-[#111014] text-white" : "border-[#e8e4ef] bg-white text-[#4f4a59] hover:border-[#cbbcf6] hover:bg-[#f7f3ff]"
+              active ? "border-[#1c1917] bg-[#1c1917] text-white" : "border-[#d6d3d1] bg-white text-[#44403c] hover:border-[#fbbf24] hover:bg-[#fef3c7]"
             }`}
           >
             <span>{verdictLabel[option]}</span>
-            <span className={`mono rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white/15 text-white" : "bg-[#f1eef8] text-[#6d28d9]"}`}>{count}</span>
+            <span className={`mono rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white/15 text-white" : "bg-[#f5f5f4] text-[#b45309]"}`}>{count}</span>
           </Link>
         );
       })}
@@ -160,14 +160,14 @@ function SortToggle({ selected, verdict }: { selected: SortKey; verdict: Verdict
     { key: "name", label: "Name" }
   ];
   return (
-    <div className="inline-flex rounded-full border border-[#e8e4ef] bg-white p-0.5 text-xs shadow-sm">
+    <div className="inline-flex rounded-full border border-[#d6d3d1] bg-white p-0.5 text-xs shadow-sm">
       {options.map((option) => {
         const active = selected === option.key;
         return (
           <Link
             key={option.key}
             href={opportunitiesHref(verdict, option.key)}
-            className={`rounded-full px-3 py-1.5 transition ${active ? "bg-[#111014] font-semibold text-white" : "text-[#6f6b78] hover:bg-[#f1eef8]"}`}
+            className={`rounded-full px-3 py-1.5 transition ${active ? "bg-[#1c1917] font-semibold text-white" : "text-[#57534e] hover:bg-[#f5f5f4]"}`}
           >
             {option.label}
           </Link>

@@ -22,7 +22,7 @@ export function AdsTable({ campaigns, products }: { campaigns: AdCampaign[]; pro
     <div className="card table-wrap">
       <table className="w-full min-w-[920px] border-collapse">
         <thead>
-          <tr className="border-b border-[#e4e6eb] bg-[#fafbfc] text-left text-[11px] uppercase tracking-[0.04em] text-[#65676b]">
+          <tr className="border-b border-[#d6d3d1] bg-[#fafaf9] text-left text-[11px] uppercase tracking-[0.04em] text-[#57534e]">
             <th className="px-4 py-3 font-bold">Campaign</th>
             <th className="px-4 py-3 font-bold">Delivery</th>
             <th className="px-4 py-3 text-right font-bold">Spent</th>
@@ -39,10 +39,10 @@ export function AdsTable({ campaigns, products }: { campaigns: AdCampaign[]; pro
             const product = campaign.productId ? productById.get(campaign.productId) : null;
             const category = resolveCampaignCategory(campaign, product);
             return (
-              <tr key={campaign.id} className="border-b border-[#e4e6eb] bg-white hover:bg-[#fafbfc]">
+              <tr key={campaign.id} className="border-b border-[#d6d3d1] bg-white hover:bg-[#fafaf9]">
                 <td className="px-4 py-4">
-                  <div className="font-bold text-[#1c1e21]">{campaign.name}</div>
-                  <div className="mt-1 text-xs text-[#65676b]">{campaign.objective} · {campaign.externalId}</div>
+                  <div className="font-bold text-[#1c1917]">{campaign.name}</div>
+                  <div className="mt-1 text-xs text-[#57534e]">{campaign.objective} · {campaign.externalId}</div>
                 </td>
                 <td className="px-4 py-4"><DeliveryPill delivery={campaign.delivery} /></td>
                 <td className="mono px-4 py-4 text-right font-semibold">{currency(campaign.spend30d)}</td>
@@ -53,16 +53,16 @@ export function AdsTable({ campaigns, products }: { campaigns: AdCampaign[]; pro
                 <td className="mono px-4 py-4 text-right">{number(campaign.impressions30d)}</td>
                 <td className="px-4 py-4 text-sm">
                   <div>
-                    <div className="font-semibold text-[#111014]">{category.label}</div>
-                    <div className="mt-1 max-w-[260px] text-xs leading-5 text-[#6f6b78]">{category.detail}</div>
-                    {product ? <Link className="mt-1 inline-block text-xs font-semibold text-[#6d28d9]" href={`/products/${product.id}`}>Linked product: {product.title}</Link> : null}
+                    <div className="font-semibold text-[#1c1917]">{category.label}</div>
+                    <div className="mt-1 max-w-[260px] text-xs leading-5 text-[#57534e]">{category.detail}</div>
+                    {product ? <Link className="mt-1 inline-block text-xs font-semibold text-[#b45309]" href={`/products/${product.id}`}>Linked product: {product.title}</Link> : null}
                   </div>
                 </td>
               </tr>
             );
           })}
-          <tr className="bg-[#fafbfc] font-bold">
-            <td className="px-4 py-4 text-[#65676b]">Totals</td>
+          <tr className="bg-[#fafaf9] font-bold">
+            <td className="px-4 py-4 text-[#57534e]">Totals</td>
             <td />
             <td className="mono px-4 py-4 text-right">{currency(totals.spend)}</td>
             <td className="mono px-4 py-4 text-right">{currency(totals.revenue)}</td>

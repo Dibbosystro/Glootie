@@ -79,7 +79,7 @@ function ApiSettingsCard({ integration }: { integration: SettingsIntegrationStat
           {integration.oauth ? (
             <a
               href={integration.oauth.href}
-              className="inline-flex h-9 items-center gap-2 rounded-full border border-[#ddd3f8] bg-[#f2ecff] px-3 text-sm font-bold text-[#6d28d9]"
+              className="inline-flex h-9 items-center gap-2 rounded-full border border-[#fde68a] bg-[#fef3c7] px-3 text-sm font-bold text-[#b45309]"
             >
               <Link2 className="h-4 w-4" />
               OAuth
@@ -97,7 +97,7 @@ function ApiSettingsCard({ integration }: { integration: SettingsIntegrationStat
             type="button"
             onClick={() => submit("remove")}
             disabled={state === "removing"}
-            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#ddd3f8] bg-[#f2ecff] px-3 text-sm font-bold text-[#6d28d9] disabled:opacity-60"
+            className="inline-flex h-9 items-center gap-2 rounded-full border border-[#fde68a] bg-[#fef3c7] px-3 text-sm font-bold text-[#b45309] disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" />
             Remove
@@ -108,8 +108,8 @@ function ApiSettingsCard({ integration }: { integration: SettingsIntegrationStat
       {open ? (
         <div className="mt-4 rounded-2xl bg-stone-50 p-4">
           {integration.oauth ? (
-            <div className="mb-4 rounded-xl border border-[#ddd3f8] bg-white p-3 text-xs leading-5 text-stone-600">
-              <div className="font-bold text-[#111014]">{integration.oauth.label}</div>
+            <div className="mb-4 rounded-xl border border-[#fde68a] bg-white p-3 text-xs leading-5 text-stone-600">
+              <div className="font-bold text-[#1c1917]">{integration.oauth.label}</div>
               <p className="mt-1">{integration.oauth.helper}</p>
             </div>
           ) : null}
@@ -156,7 +156,7 @@ function ApiSettingsCard({ integration }: { integration: SettingsIntegrationStat
         </div>
       ) : null}
 
-      {message ? <p className={`mt-3 text-xs font-semibold ${state === "error" ? "text-[#6d28d9]" : "text-emerald-700"}`}>{message}</p> : null}
+      {message ? <p className={`mt-3 text-xs font-semibold ${state === "error" ? "text-[#b45309]" : "text-emerald-700"}`}>{message}</p> : null}
     </div>
   );
 }

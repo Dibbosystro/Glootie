@@ -23,8 +23,8 @@ export function DeliveryPill({ delivery }: { delivery: string }) {
   const active = delivery === "active" || delivery === "learning";
   const limited = delivery === "limited";
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${active ? "bg-[#e7f5ec] text-[#31a24c]" : limited ? "bg-[#f2ecff] text-[#6d28d9]" : "bg-[#f2ecff] text-[#6d28d9]"}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[#31a24c]" : limited ? "bg-[#6d28d9]" : "bg-[#6d28d9]"}`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${active ? "bg-[#e7f5ec] text-[#31a24c]" : limited ? "bg-[#fef3c7] text-[#b45309]" : "bg-[#fef3c7] text-[#b45309]"}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-[#31a24c]" : limited ? "bg-[#b45309]" : "bg-[#b45309]"}`} />
       {delivery}
     </span>
   );
