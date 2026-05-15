@@ -86,6 +86,11 @@ export function AppShell({ data, children }: { data: DashboardData; children: Re
                 ))}
               </div>
             </div>
+            <div className="flex items-center gap-2 px-1 pt-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#78716c]">Built by</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/morsegrid-logo-white.png" alt="MorseGrid" className="h-3 w-auto opacity-90" />
+            </div>
           </div>
         </aside>
 
@@ -126,6 +131,11 @@ export function AppShell({ data, children }: { data: DashboardData; children: Re
                 <NavGroup label="Studio" items={studioNav} pathname={pathname} dark onNavigate={() => setMobileNavOpen(false)} />
                 <NavGroup label="Workspace" items={workspaceNav} pathname={pathname} dark onNavigate={() => setMobileNavOpen(false)} />
               </nav>
+              <div className="flex items-center gap-2 border-t border-[#292524] px-5 py-4">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#78716c]">Built by</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/morsegrid-logo-white.png" alt="MorseGrid" className="h-3 w-auto opacity-90" />
+              </div>
             </aside>
           </div>
         ) : null}
