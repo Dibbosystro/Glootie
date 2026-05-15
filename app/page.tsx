@@ -3,7 +3,7 @@ import { AlertTriangle, Check, ChevronRight, PauseCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { MetricStrip } from "@/components/metric-strip";
 import { RecommendationPill } from "@/components/status-pill";
-import { SpendTreemap } from "@/components/spend-treemap";
+import { CampaignPerformance } from "@/components/campaign-performance";
 import { SyncButton } from "@/components/sync-button";
 import { getDashboardData, getOverviewKpis } from "@/lib/data";
 import { currency, number as formatNumber, percent, roas } from "@/lib/format";
@@ -47,22 +47,7 @@ export default async function OverviewPage({ searchParams }: { searchParams?: Pr
 
         <MetricStrip kpis={kpis} />
 
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SpendTreemap
-            campaigns={channelView.campaigns}
-            metric="spend"
-            title="Where the money is going"
-            subtitle="Top campaigns by 30-day spend. Colour = ROAS tier."
-            href={channel === "google" ? "/ads/google" : channel === "meta" ? "/ads/meta" : "/ads/meta"}
-          />
-          <SpendTreemap
-            campaigns={channelView.campaigns}
-            metric="revenue"
-            title="Where the money is coming back"
-            subtitle="Top campaigns by 30-day attributed revenue."
-            href={channel === "google" ? "/ads/google" : channel === "meta" ? "/ads/meta" : "/ads/meta"}
-          />
-        </section>
+        <CampaignPerformance campaigns={channelView.campaigns} />
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
@@ -206,13 +191,15 @@ function ShopifySalesSessionCard({ data }: { data: DashboardData }) {
   const orders = insights?.orders30d ?? data.products.reduce((sum, product) => sum + product.unitsSold30d, 0);
   const salesSegments = buildProductSegments(data.products, "revenue30d");
   const sessionSegments = buildProductSegments(data.products, "sessions30d");
+  const salesTotal = salesSegments.reduce((sum, segment) => sum + segment.value, 0);
 
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-bold">Shopify signal</h2>
-          <p className="text-[11px] text-[#57534e]">Sales and sessions, last 30 days</p>
+          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#78716c]">Shopify signal</div>
+          <h2 className="mt-1 text-base font-bold text-[#1c1917]">Sales and sessions</h2>
+          <p className="text-[11px] text-[#78716c]">Last 30 days</p>
         </div>
         <Link href="/products" className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#b45309]">
           Open
@@ -220,69 +207,75 @@ function ShopifySalesSessionCard({ data }: { data: DashboardData }) {
         </Link>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <MiniPie
-          title="Sales"
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <StatBlock
+          label="Sales"
           value={currency(revenue, data.client.currency)}
-          helper={`${formatNumber(orders)} orders`}
-          segments={salesSegments}
-          emptyValue="--"
-          emptyLabel="No Shopify sales yet"
+          sub={`${formatNumber(orders)} orders`}
         />
-        <MiniPie
-          title="Sessions"
-          value={sessions > 0 ? formatNumber(sessions) : "--"}
-          helper={sessions > 0 ? `${percent(orders / Math.max(sessions, 1), 2)} order rate` : "Coming soon"}
-          segments={sessionSegments}
-          emptyValue="--"
-          emptyLabel="Analytics integration in progress"
+        <StatBlock
+          label="Sessions"
+          value={sessions > 0 ? formatNumber(sessions) : "—"}
+          sub={sessions > 0 ? `${percent(orders / Math.max(sessions, 1), 2)} order rate` : "Coming soon"}
+          dim={sessions === 0}
         />
       </div>
 
-      <div className="mt-4 space-y-2">
-        <SignalLegend label="Top sales source" segments={salesSegments} emptyLabel="Waiting for Shopify orders" />
-        <SignalLegend label="Top session source" segments={sessionSegments} emptyLabel="Coming soon, analytics integration in progress" />
-      </div>
-    </div>
-  );
-}
-
-function MiniPie({ title, value, helper, segments, emptyValue, emptyLabel }: { title: string; value: string; helper: string; segments: PieSegment[]; emptyValue: string; emptyLabel: string }) {
-  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
-  const background = total > 0 ? pieGradient(segments, total) : "conic-gradient(#e7e5e4 0deg 360deg)";
-  const displayValue = total > 0 ? value : emptyValue;
-  const caption = total > 0 ? helper : emptyLabel;
-
-  return (
-    <div className="rounded-2xl border border-[#e7e5e4] bg-[#fafaf9] p-3">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#78716c]">{title}</div>
-      <div className="mt-3 grid place-items-center">
-        <div className="relative grid h-24 w-24 place-items-center rounded-full" style={{ background }}>
-          <div className="grid h-[62px] w-[62px] place-items-center rounded-full bg-white text-center shadow-inner">
-            <div className="mono text-sm font-bold leading-tight text-[#1c1917]">{displayValue}</div>
+      {salesTotal > 0 ? (
+        <div className="mt-4">
+          <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#78716c]">Top sales sources</div>
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#e7e5e4]">
+            {salesSegments.map((segment) => (
+              <span key={segment.label} style={{ width: `${(segment.value / salesTotal) * 100}%`, background: segment.color }} />
+            ))}
           </div>
+          <ul className="mt-3 space-y-1.5">
+            {salesSegments.slice(0, 3).map((segment) => (
+              <li key={segment.label} className="flex items-center gap-2 text-[11px]">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: segment.color }} />
+                <span className="min-w-0 flex-1 truncate text-[#1c1917]">{segment.label}</span>
+                <span className="mono shrink-0 font-bold text-[#57534e]">{percent(segment.value / salesTotal, 1)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
+      ) : (
+        <div className="mt-4 rounded-md border border-dashed border-[#d6d3d1] px-3 py-3 text-[11px] text-[#78716c]">
+          Waiting for Shopify orders.
+        </div>
+      )}
+
+      <div className="mt-4 border-t border-[#e7e5e4] pt-3">
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-[#78716c]">Top session sources</div>
+        {sessionSegments.length > 0 ? (
+          <ul className="space-y-1.5">
+            {sessionSegments.slice(0, 3).map((segment) => (
+              <li key={segment.label} className="flex items-center gap-2 text-[11px]">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: segment.color }} />
+                <span className="min-w-0 flex-1 truncate text-[#1c1917]">{segment.label}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-[11px] text-[#78716c]">Coming soon, analytics integration in progress.</p>
+        )}
       </div>
-      <p className="mt-3 truncate text-center text-[11px] font-medium text-[#57534e]">{caption}</p>
     </div>
   );
 }
 
-function SignalLegend({ label, segments, emptyLabel }: { label: string; segments: PieSegment[]; emptyLabel: string }) {
-  const top = segments[0];
+function StatBlock({ label, value, sub, dim }: { label: string; value: string; sub: string; dim?: boolean }) {
   return (
-    <div className="flex items-center gap-2 rounded-2xl bg-[#fafaf9] px-3 py-2">
-      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: top?.color ?? "#d6d3d1" }} />
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-[0.12em] text-[#78716c]">{label}</div>
-        <div className="truncate text-xs font-bold text-[#1c1917]">{top ? top.label : emptyLabel}</div>
-      </div>
+    <div className="rounded-lg border border-[#e7e5e4] bg-[#fafaf9] p-3">
+      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#78716c]">{label}</div>
+      <div className={`mono mt-2 text-xl font-bold leading-none tracking-[-0.02em] ${dim ? "text-[#a8a29e]" : "text-[#1c1917]"}`}>{value}</div>
+      <div className="mt-1.5 text-[11px] text-[#57534e]">{sub}</div>
     </div>
   );
 }
 
 function buildProductSegments(products: Product[], metric: "revenue30d" | "sessions30d"): PieSegment[] {
-  const colors = ["#059669", "#b45309", "#1c1917", "#fcd34d"];
+  const colors = ["#15803d", "#b45309", "#1c1917", "#fcd34d"];
   const sorted = [...products]
     .filter((product) => product[metric] > 0)
     .sort((a, b) => b[metric] - a[metric]);
@@ -296,17 +289,6 @@ function buildProductSegments(products: Product[], metric: "revenue30d" | "sessi
   const other = sorted.slice(3).reduce((sum, product) => sum + product[metric], 0);
   if (other > 0) top.push({ label: "Other products", value: other, color: colors[3] });
   return top;
-}
-
-function pieGradient(segments: PieSegment[], total: number) {
-  let cursor = 0;
-  const stops = segments.map((segment) => {
-    const start = cursor;
-    const end = cursor + (segment.value / total) * 360;
-    cursor = end;
-    return `${segment.color} ${start}deg ${end}deg`;
-  });
-  return `conic-gradient(${stops.join(", ")})`;
 }
 
 function ChannelToggle({ selected, data }: { selected: Channel; data: DashboardData }) {
