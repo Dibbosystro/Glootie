@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Bell,
+  BookOpen,
   Bot,
   CalendarDays,
   Home,
@@ -35,6 +36,10 @@ const studioNav = [
   { href: "/image-maker", label: "Image Maker", icon: ImageIcon }
 ];
 
+const supportNav = [
+  { href: "/support/kb", label: "KB Articles", icon: BookOpen }
+];
+
 const workspaceNav = [{ href: "/settings", label: "Integrations", icon: Settings, badge: 4 }];
 
 export function AppShell({ data, children }: { data: DashboardData; children: React.ReactNode }) {
@@ -60,6 +65,7 @@ export function AppShell({ data, children }: { data: DashboardData; children: Re
           <nav className="flex-1 overflow-y-auto px-3 pb-3">
             <NavGroup label="Pinned" items={pinnedNav} pathname={pathname} dark />
             <NavGroup label="Studio" items={studioNav} pathname={pathname} dark />
+            <NavGroup label="Support" items={supportNav} pathname={pathname} dark />
             <NavGroup label="Workspace" items={workspaceNav} pathname={pathname} dark />
           </nav>
 
@@ -129,6 +135,7 @@ export function AppShell({ data, children }: { data: DashboardData; children: Re
               <nav className="flex-1 overflow-y-auto px-3 pb-3">
                 <NavGroup label="Pinned" items={pinnedNav} pathname={pathname} dark onNavigate={() => setMobileNavOpen(false)} />
                 <NavGroup label="Studio" items={studioNav} pathname={pathname} dark onNavigate={() => setMobileNavOpen(false)} />
+                <NavGroup label="Support" items={supportNav} pathname={pathname} dark onNavigate={() => setMobileNavOpen(false)} />
                 <NavGroup label="Workspace" items={workspaceNav} pathname={pathname} dark onNavigate={() => setMobileNavOpen(false)} />
               </nav>
               <div className="flex items-center gap-2 border-t border-[#292524] px-5 py-4">

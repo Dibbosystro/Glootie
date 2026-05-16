@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache as reactCache } from "react";
+import { unstable_cache as nextCache } from "next/cache";
 import type { AdCampaign, DashboardData, IntegrationStatus, Kpi, Product, ProviderKeyStatus, Recommendation } from "@/lib/types";
 import { seedCampaigns, seedClient, seedIntegrations, seedProducts, seedRecommendations, seedSyncRuns } from "@/lib/seed";
 import { currency, percent, roas } from "@/lib/format";
@@ -8,7 +10,9 @@ import { isCredentialKeyConfigured } from "@/lib/db/credentials";
 import { fetchShopifyProducts } from "@/lib/integrations/shopify";
 import { fetchMetaCampaigns } from "@/lib/integrations/meta";
 
-export async function getDashboardData(): Promise<DashboardData> {
+export const DASHBOARD_CACHE_TAG = "dashboard";
+
+async function fetchDashboardData(): Promise<DashboardData> {
   const [shopifyResult, metaResult] = await Promise.allSettled([fetchShopifyProducts(), fetchMetaCampaigns()]);
   const liveProducts = shopifyResult.status === "fulfilled" ? shopifyResult.value.products : [];
   const liveShopifyInsights = shopifyResult.status === "fulfilled" ? shopifyResult.value.insights : undefined;
@@ -38,6 +42,18 @@ export async function getDashboardData(): Promise<DashboardData> {
     shopifyInsights: liveShopifyInsights ?? buildSeedShopifyInsights(products)
   };
 }
+
+const cachedDashboardData = nextCache(
+  async () => fetchDashboardData(),
+  ["glootie:dashboard-data:v1"],
+  { revalidate: 60, tags: [DASHBOARD_CACHE_TAG] }
+);
+
+// React cache() dedupes within a single request, so AppShell + the page can both
+// call getDashboardData() without paying twice. Next.js cache holds the snapshot
+// across requests for 60s, invalidated via revalidateTag(DASHBOARD_CACHE_TAG) on
+// any Sync route.
+export const getDashboardData = reactCache(async (): Promise<DashboardData> => cachedDashboardData());
 
 async function withRuntimeConnectionStatus(integrations: IntegrationStatus[]): Promise<IntegrationStatus[]> {
   const [hasShopify, hasMeta, hasGoogle, hasOpenAi, hasNeokens] = await Promise.all([

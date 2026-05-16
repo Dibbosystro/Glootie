@@ -1,6 +1,7 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { cache as reactCache } from "react";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { integrations } from "@/lib/db/schema";
 import { upsertClient } from "@/lib/db/persistence";
@@ -10,29 +11,52 @@ import { getServerEnv } from "@/lib/server-env";
 import type { Client } from "@/lib/types";
 
 type CredentialBag = Record<string, string>;
+type CredentialBags = Record<string, CredentialBag>;
 
-export async function getCredentialValue(integrationType: string, key: string, client: Client = seedClient): Promise<string | undefined> {
-  const stored = await getStoredIntegrationCredentials(integrationType, client);
-  return stored[key] || getServerEnv(key);
-}
-
-export async function getStoredIntegrationCredentials(integrationType: string, client: Client = seedClient): Promise<CredentialBag> {
+// One DB query per request loads every integration row for the client. Wrapping
+// in React cache dedupes within a single request, so the chain of
+// getCredentialValue / isCredentialKeyConfigured calls all share the same SELECT.
+const loadCredentialBags = reactCache(async (clientName: string, clientPayload: Client): Promise<CredentialBags> => {
+  void clientName;
   const db = getDb();
   if (!db) return {};
 
-  const clientId = await upsertClient(client);
-  const [row] = await db
-    .select({ encryptedCredentials: integrations.encryptedCredentials })
-    .from(integrations)
-    .where(and(eq(integrations.clientId, clientId), eq(integrations.type, integrationType)))
-    .limit(1);
+  try {
+    const clientId = await upsertClient(clientPayload);
+    const rows = await db
+      .select({ type: integrations.type, encryptedCredentials: integrations.encryptedCredentials })
+      .from(integrations)
+      .where(eq(integrations.clientId, clientId));
 
-  return decryptJson<CredentialBag>(row?.encryptedCredentials) ?? {};
+    const bags: CredentialBags = {};
+    for (const row of rows) {
+      bags[row.type] = decryptJson<CredentialBag>(row.encryptedCredentials) ?? {};
+    }
+    return bags;
+  } catch {
+    return {};
+  }
+});
+
+async function getCredentialBag(integrationType: string, client: Client): Promise<CredentialBag> {
+  const bags = await loadCredentialBags(client.name, client);
+  return bags[integrationType] ?? {};
+}
+
+export async function getCredentialValue(integrationType: string, key: string, client: Client = seedClient): Promise<string | undefined> {
+  const envValue = getServerEnv(key);
+  if (envValue) return envValue;
+  const bag = await getCredentialBag(integrationType, client);
+  return bag[key] || undefined;
+}
+
+export async function getStoredIntegrationCredentials(integrationType: string, client: Client = seedClient): Promise<CredentialBag> {
+  return getCredentialBag(integrationType, client);
 }
 
 export async function hasStoredCredentialKey(integrationType: string, key: string, client: Client = seedClient): Promise<boolean> {
-  const stored = await getStoredIntegrationCredentials(integrationType, client);
-  return Boolean(stored[key]);
+  const bag = await getCredentialBag(integrationType, client);
+  return Boolean(bag[key]);
 }
 
 export async function isCredentialKeyConfigured(integrationType: string, key: string, client: Client = seedClient): Promise<boolean> {

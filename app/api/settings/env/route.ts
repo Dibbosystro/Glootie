@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { requireAccess } from "@/lib/auth";
+import { DASHBOARD_CACHE_TAG } from "@/lib/data";
 import { getDb } from "@/lib/db/client";
 import { removeStoredIntegrationCredentials, upsertStoredIntegrationCredentials } from "@/lib/db/credentials";
 import { getSettingsIntegrationForKey, allowedSettingsEnvKeys } from "@/lib/integration-config";
@@ -32,10 +34,12 @@ export async function POST(request: Request) {
         await upsertStoredIntegrationCredentials(integrationType, integrationValues);
       }
 
+      revalidateTag(DASHBOARD_CACHE_TAG);
       return NextResponse.json({ message: "Encrypted credentials saved to the database. Refreshing status." });
     }
 
     upsertLocalEnv(values);
+    revalidateTag(DASHBOARD_CACHE_TAG);
     return NextResponse.json({ message: "App-local API settings saved. Refreshing status." });
   }
 
@@ -50,10 +54,12 @@ export async function POST(request: Request) {
       for (const integrationType of integrationTypes) {
         await removeStoredIntegrationCredentials(integrationType);
       }
+      revalidateTag(DASHBOARD_CACHE_TAG);
       return NextResponse.json({ message: "Encrypted credentials removed from the database. Refreshing status." });
     }
 
     removeLocalEnv(keys);
+    revalidateTag(DASHBOARD_CACHE_TAG);
     return NextResponse.json({ message: "App-local API settings removed. Refreshing status." });
   }
 

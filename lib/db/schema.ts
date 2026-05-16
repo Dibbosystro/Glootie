@@ -175,3 +175,28 @@ export const imageGenerations = pgTable("image_generations", {
   status: text("status").notNull().default("prompt_ready"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
+
+export const kbDocuments = pgTable(
+  "kb_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    contentMd: text("content_md").notNull(),
+    currentVersion: integer("current_version").notNull().default(1),
+    updatedBy: text("updated_by").notNull().default("system"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (t) => [uniqueIndex("kb_documents_client_slug_uq").on(t.clientId, t.slug)]
+);
+
+export const kbDocumentVersions = pgTable("kb_document_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  documentId: uuid("document_id").notNull().references(() => kbDocuments.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  contentMd: text("content_md").notNull(),
+  editor: text("editor").notNull().default("system"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
