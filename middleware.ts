@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/_next", "/favicon.ico"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/support/kb/bulk-upsert", "/_next", "/favicon.ico"];
 
 export function middleware(request: NextRequest) {
   const passwordEnabled = Boolean(process.env.APP_ACCESS_PASSWORD);
