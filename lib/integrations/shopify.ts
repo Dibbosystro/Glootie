@@ -109,13 +109,43 @@ export async function fetchShopifyProducts(): Promise<{ products: Product[]; ins
     // recommendations, but some Shopify tokens may not include read_orders.
   }
 
+  const sessions30d = await fetchShopifyTotalSessions(shop, token);
+
   const products = rawProducts.map((product) => mapShopifyProduct(product, salesResult.salesByProduct.get(String(product.id))));
 
   return {
     products,
-    insights: buildShopifyInsights(products, salesResult.orders30d),
+    insights: buildShopifyInsights(products, salesResult.orders30d, sessions30d),
     ordersRead
   };
+}
+
+async function fetchShopifyTotalSessions(shop: string, token: string): Promise<number> {
+  const query = `query { shopifyqlQuery(query: "FROM sessions SHOW total_sessions SINCE -30d UNTIL today") { tableData { rowData } parseErrors { message } } }`;
+  try {
+    const res = await fetch(`https://${shop}/admin/api/2026-01/graphql.json`, {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json"
+      },
+      cache: "no-store",
+      body: JSON.stringify({ query })
+    });
+    if (!res.ok) return 0;
+    const json = (await res.json()) as {
+      data?: { shopifyqlQuery?: { tableData?: { rowData?: string[][] } | null; parseErrors?: Array<{ message: string }> | null } | null };
+      errors?: Array<{ message: string; extensions?: { code?: string } }>;
+    };
+    if (json.errors?.length) return 0;
+    if (json.data?.shopifyqlQuery?.parseErrors?.length) return 0;
+    const rows = json.data?.shopifyqlQuery?.tableData?.rowData ?? [];
+    const first = rows[0]?.[0];
+    const sessions = first ? Number(first) : 0;
+    return Number.isFinite(sessions) ? Math.round(sessions) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 async function fetchProductSalesSignals(shop: string, token: string): Promise<{ salesByProduct: Map<string, ProductSalesSignal>; orders30d: number }> {
@@ -195,7 +225,7 @@ function mapShopifyProduct(product: ShopifyProductRaw, sales?: ProductSalesSigna
   };
 }
 
-function buildShopifyInsights(products: Product[], orders30d: number): ShopifyInsights {
+function buildShopifyInsights(products: Product[], orders30d: number, sessions30d: number): ShopifyInsights {
   const revenue30d = products.reduce((sum, product) => sum + product.revenue30d, 0);
   const unitsSold30d = products.reduce((sum, product) => sum + product.unitsSold30d, 0);
   const activeProducts = products.filter((product) => product.status === "active").length;
@@ -203,12 +233,13 @@ function buildShopifyInsights(products: Product[], orders30d: number): ShopifyIn
     .filter((product) => product.status === "active")
     .reduce((sum, product) => sum + Math.max(0, product.inventoryQty), 0);
   const outOfStockProducts = products.filter((product) => product.status === "active" && product.inventoryQty <= 0).length;
+  const conversionRate = sessions30d > 0 ? orders30d / sessions30d : 0;
   return {
     revenue30d: Number(revenue30d.toFixed(2)),
     orders30d,
     unitsSold30d,
-    sessions30d: 0,
-    conversionRate: 0,
+    sessions30d,
+    conversionRate: Number(conversionRate.toFixed(4)),
     activeProducts,
     totalProducts: products.length,
     totalInventory,
