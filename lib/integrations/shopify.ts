@@ -121,7 +121,7 @@ export async function fetchShopifyProducts(): Promise<{ products: Product[]; ins
 }
 
 async function fetchShopifyTotalSessions(shop: string, token: string): Promise<number> {
-  const query = `query { shopifyqlQuery(query: "FROM sessions SHOW total_sessions SINCE -30d UNTIL today") { tableData { rowData } parseErrors { message } } }`;
+  const query = `query { shopifyqlQuery(query: "FROM sessions SHOW sessions SINCE -30d UNTIL today") { tableData { rows } parseErrors } }`;
   try {
     const res = await fetch(`https://${shop}/admin/api/2026-01/graphql.json`, {
       method: "POST",
@@ -134,14 +134,13 @@ async function fetchShopifyTotalSessions(shop: string, token: string): Promise<n
     });
     if (!res.ok) return 0;
     const json = (await res.json()) as {
-      data?: { shopifyqlQuery?: { tableData?: { rowData?: string[][] } | null; parseErrors?: Array<{ message: string }> | null } | null };
+      data?: { shopifyqlQuery?: { tableData?: { rows?: Array<Record<string, string | number>> } | null; parseErrors?: string[] | null } | null };
       errors?: Array<{ message: string; extensions?: { code?: string } }>;
     };
     if (json.errors?.length) return 0;
     if (json.data?.shopifyqlQuery?.parseErrors?.length) return 0;
-    const rows = json.data?.shopifyqlQuery?.tableData?.rowData ?? [];
-    const first = rows[0]?.[0];
-    const sessions = first ? Number(first) : 0;
+    const first = json.data?.shopifyqlQuery?.tableData?.rows?.[0];
+    const sessions = Number(first?.sessions ?? 0);
     return Number.isFinite(sessions) ? Math.round(sessions) : 0;
   } catch {
     return 0;
