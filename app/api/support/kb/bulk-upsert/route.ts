@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { timingSafeEqual } from "node:crypto";
 import { bulkUpsertKbArticles, type KbArticleInput } from "@/lib/support/kb";
@@ -41,6 +42,8 @@ export async function POST(request: Request) {
 
   try {
     const results = await bulkUpsertKbArticles(articles, body.editor ?? "cli");
+    revalidatePath("/support/kb");
+    revalidatePath("/support");
     return NextResponse.json({ results });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

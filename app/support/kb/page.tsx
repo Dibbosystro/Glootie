@@ -4,6 +4,8 @@ import { getDashboardData } from "@/lib/data";
 import { listKbArticles } from "@/lib/support/kb";
 import { dateShort } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
+
 export default async function SupportKbPage() {
   const data = await getDashboardData();
   const articles = await listKbArticles();

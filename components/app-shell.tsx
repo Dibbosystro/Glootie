@@ -11,6 +11,7 @@ import {
   Home,
   ImageIcon,
   LineChart,
+  MessageSquare,
   Menu,
   Megaphone,
   Search,
@@ -37,6 +38,7 @@ const studioNav = [
 ];
 
 const supportNav = [
+  { href: "/support", label: "Reply Composer", icon: MessageSquare },
   { href: "/support/kb", label: "KB Articles", icon: BookOpen }
 ];
 
