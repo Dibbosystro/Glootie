@@ -38,7 +38,7 @@ const studioNav = [
 ];
 
 const supportNav = [
-  { href: "/support", label: "Reply Composer", icon: MessageSquare },
+  { href: "/support", label: "Reply Composer", icon: MessageSquare, exact: true },
   { href: "/support/kb", label: "KB Articles", icon: BookOpen }
 ];
 
@@ -201,7 +201,7 @@ function NavGroup({
   onNavigate
 }: {
   label: string;
-  items: Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }>;
+  items: Array<{ href: string; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number; exact?: boolean }>;
   pathname: string;
   dark?: boolean;
   onNavigate?: () => void;
@@ -212,7 +212,7 @@ function NavGroup({
       <div className="space-y-0.5">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item.href, item.exact);
           if (dark) {
             return (
               <Link
@@ -249,7 +249,8 @@ function NavGroup({
   );
 }
 
-function isActive(pathname: string, href: string) {
+function isActive(pathname: string, href: string, exact?: boolean) {
   if (href === "/") return pathname === "/";
+  if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
