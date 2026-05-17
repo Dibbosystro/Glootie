@@ -375,53 +375,18 @@ function OpportunityCard({ recommendation, product }: { recommendation: Recommen
 }
 
 function AdsSalesChart({ channel, stale }: { channel: Channel; stale: boolean }) {
-  const width = 760;
-  const height = 230;
-  const series = getChartSeries(channel, stale);
-  const revenue = series.revenue;
-  const spend = series.spend;
-  const pathFor = (values: number[]) => {
-    const step = width / (values.length - 1);
-    return values
-      .map((value, index) => {
-        const x = index * step;
-        const y = height - 24 - value;
-        if (index === 0) return `M${x},${y}`;
-        const previousX = (index - 1) * step;
-        const previousY = height - 24 - values[index - 1];
-        const controlX = (previousX + x) / 2;
-        return `C${controlX},${previousY} ${controlX},${y} ${x},${y}`;
-      })
-      .join(" ");
-  };
-  const revenuePath = pathFor(revenue);
-  const spendPath = pathFor(spend);
+  void channel;
+  void stale;
+  // Real daily revenue/spend series will be sourced from ad_metrics_daily once
+  // the nightly sync starts persisting them. Until then, render an honest empty
+  // state instead of fabricated curves.
   return (
-    <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[230px] w-full">
-        <defs>
-          <linearGradient id="overview-revenue" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="overview-spend" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#b45309" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0, 1, 2, 3, 4].map((index) => (
-          <line key={index} x1="0" x2={width} y1={24 + index * 42} y2={24 + index * 42} stroke="#d6d3d1" strokeDasharray="3 7" />
-        ))}
-        <path d={`${revenuePath} L${width},${height} L0,${height} Z`} fill="url(#overview-revenue)" />
-        <path d={`${spendPath} L${width},${height} L0,${height} Z`} fill="url(#overview-spend)" />
-        <path d={revenuePath} fill="none" stroke="#059669" strokeLinecap="round" strokeWidth="2.5" />
-        <path d={spendPath} fill="none" stroke="#b45309" strokeLinecap="round" strokeWidth="2.5" />
-        <circle cx="617" cy="62" r="4" fill="#059669" stroke="white" strokeWidth="2" />
-      </svg>
-      <div className="-mt-2 flex justify-between px-2 text-[10px] text-[#78716c]">
-        {["15 Apr", "17 Apr", "19 Apr", "21 Apr", "23 Apr", "25 Apr", "27 Apr", "29 Apr", "1 May", "3 May", "5 May", "7 May"].map((label) => (
-          <span key={label}>{label}</span>
-        ))}
+    <div className="flex h-[230px] items-center justify-center rounded-md border border-dashed border-[#e7e5e4] bg-[#fafaf9] px-6 text-center">
+      <div>
+        <p className="text-sm font-bold text-[#1c1917]">Daily history not available yet</p>
+        <p className="mt-1 text-xs text-[#57534e]">
+          Daily revenue and spend pacing populates after the nightly Meta and Google Ads sync runs land in the database. Use the metric cards above for the 30 day totals.
+        </p>
       </div>
     </div>
   );
@@ -488,25 +453,3 @@ function getChannelCampaigns(campaigns: AdCampaign[], channel: Channel) {
   return campaigns.filter((campaign) => campaign.source === "meta" || campaign.source === "google_ads");
 }
 
-function getChartSeries(channel: Channel, stale: boolean) {
-  const series = {
-    all: {
-      revenue: [82, 110, 166, 136, 112, 120, 128, 140, 132, 146, 124, 154, 140, 116, 168, 174, 146, 168, 10, 9, 9, 9],
-      spend: [72, 72, 70, 75, 73, 68, 69, 66, 64, 67, 66, 61, 65, 62, 66, 68, 66, 64, 8, 8, 8, 8]
-    },
-    meta: {
-      revenue: [74, 96, 148, 123, 101, 106, 118, 126, 124, 133, 112, 141, 129, 105, 151, 160, 132, 154, 9, 8, 8, 8],
-      spend: [62, 63, 61, 66, 64, 61, 59, 57, 58, 56, 54, 53, 56, 54, 57, 59, 58, 56, 7, 7, 7, 7]
-    },
-    google: {
-      revenue: [24, 30, 38, 34, 29, 32, 36, 39, 37, 43, 38, 45, 42, 35, 46, 49, 41, 44, 11, 10, 10, 10],
-      spend: [18, 18, 19, 20, 19, 18, 18, 17, 18, 18, 17, 17, 18, 17, 18, 19, 18, 18, 8, 8, 8, 8]
-    }
-  } satisfies Record<Channel, { revenue: number[]; spend: number[] }>;
-
-  if (!stale) return series[channel];
-  return {
-    revenue: series[channel].revenue.map((value, index) => (index > 17 ? value : Math.round(value * 0.72))),
-    spend: series[channel].spend.map((value, index) => (index > 17 ? value : Math.round(value * 0.9)))
-  };
-}

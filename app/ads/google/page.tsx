@@ -38,20 +38,13 @@ export default async function GoogleAdsPage() {
               <MiniStat label="Revenue" value={currency(totalRevenue)} />
               <MiniStat label="Campaigns" value={String(campaigns.length)} />
             </div>
-            <div className="mt-5 flex h-[220px] items-end gap-2 border-b border-l border-[#d6d3d1] px-3 pb-3">
-              {Array.from({ length: 14 }).map((_, index) => {
-                const spendHeight = 28 + ((index * 19) % 52);
-                const purchaseDay = index === 2 || index === 5 || index === 9 || index === 12;
-                return (
-                  <div key={index} className="flex flex-1 flex-col items-center gap-1">
-                    <div className={`w-full rounded-t-md ${purchaseDay ? "bg-[#31a24c]" : "bg-[#b45309]"}`} style={{ height: `${spendHeight}%` }} />
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-3 flex items-center gap-4 text-xs text-[#57534e]">
-              <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#b45309]" /> Spend day</span>
-              <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#31a24c]" /> Purchase signal</span>
+            <div className="mt-5 flex h-[220px] items-center justify-center rounded-md border border-dashed border-[#e7e5e4] bg-[#fafaf9] px-6 text-center">
+              <div>
+                <p className="text-sm font-bold text-[#1c1917]">Daily Google Ads history not available yet</p>
+                <p className="mt-1 text-xs text-[#57534e]">
+                  Per-day spend and purchase bars will populate after the Google Ads GAQL daily sync is enabled. Use the 30 day totals above for now.
+                </p>
+              </div>
             </div>
           </div>
 

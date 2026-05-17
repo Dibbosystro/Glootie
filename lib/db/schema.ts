@@ -184,6 +184,9 @@ export const kbDocuments = pgTable(
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     contentMd: text("content_md").notNull(),
+    // Postgres tsvector column. Maintained by a trigger created in the manual
+    // SQL migration. Used for FTS with English stemming.
+    contentTsv: text("content_tsv"),
     currentVersion: integer("current_version").notNull().default(1),
     updatedBy: text("updated_by").notNull().default("system"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -199,4 +202,42 @@ export const kbDocumentVersions = pgTable("kb_document_versions", {
   contentMd: text("content_md").notNull(),
   editor: text("editor").notNull().default("system"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const supportConversations = pgTable("support_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  title: text("title").notNull().default(""),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const supportMessages = pgTable("support_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => supportConversations.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  toolName: text("tool_name"),
+  toolInput: jsonb("tool_input"),
+  toolOutput: jsonb("tool_output"),
+  model: text("model"),
+  provider: text("provider"),
+  confidence: text("confidence"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const activityLog = pgTable("activity_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  type: text("type").notNull(),
+  status: text("status").notNull(),
+  actor: text("actor").notNull().default("system"),
+  summary: text("summary").notNull().default(""),
+  detail: jsonb("detail"),
+  errorMessage: text("error_message"),
+  durationMs: integer("duration_ms"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true })
 });

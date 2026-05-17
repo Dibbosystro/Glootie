@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  Activity,
   Bell,
   BookOpen,
   Bot,
@@ -42,7 +43,10 @@ const supportNav = [
   { href: "/support/kb", label: "KB Articles", icon: BookOpen }
 ];
 
-const workspaceNav = [{ href: "/settings", label: "Integrations", icon: Settings, badge: 4 }];
+const workspaceNav = [
+  { href: "/activity", label: "Activity", icon: Activity },
+  { href: "/settings", label: "Integrations", icon: Settings, badge: 4 }
+];
 
 export function AppShell({ data, children }: { data: DashboardData; children: React.ReactNode }) {
   const pathname = usePathname();

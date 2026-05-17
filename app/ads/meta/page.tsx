@@ -39,16 +39,15 @@ export default async function MetaAdsPage() {
             </div>
             <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1fr)_360px]">
               <div>
-                <div className="flex h-[240px] items-end gap-1 border-b border-l border-[#d6d3d1] px-3 pb-3">
-                  {Array.from({ length: 30 }).map((_, index) => {
-                    const height = 34 + ((index * 17) % 54);
-                    const purchase = index % 2 === 1 || index === 26;
-                    return <div key={index} title={`Day ${index + 1}`} className={`flex-1 rounded-t-sm ${purchase ? "bg-[#31a24c]" : "bg-[#b45309]"}`} style={{ height: `${height}%` }} />;
-                  })}
+                <div className="flex h-[240px] items-center justify-center rounded-md border border-dashed border-[#e7e5e4] bg-[#fafaf9] px-6 text-center">
+                  <div>
+                    <p className="text-sm font-bold text-[#1c1917]">Daily pacing not available yet</p>
+                    <p className="mt-1 text-xs text-[#57534e]">
+                      Per-day Meta spend and purchase bars populate once daily metrics start landing from the Meta Insights API. For now use the 30 day totals and the pie charts.
+                    </p>
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center gap-4 text-xs text-[#57534e]">
-                  <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#b45309]" /> Spend day</span>
-                  <span><span className="inline-block h-2.5 w-2.5 rounded-sm bg-[#31a24c]" /> Purchase day</span>
                   <span className="ml-auto">Total: {currency(totalSpend)} spent · {currency(totalRevenue)} revenue</span>
                 </div>
               </div>

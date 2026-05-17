@@ -1,10 +1,18 @@
 import "server-only";
 
+import { getDb } from "@/lib/db/client";
+import { supportConversations, supportMessages } from "@/lib/db/schema";
 import { getCredentialValue } from "@/lib/db/credentials";
+import { upsertClient } from "@/lib/db/persistence";
+import { seedClient } from "@/lib/seed";
+import { recordActivity, type ActivityHandle } from "@/lib/support/activity";
 import { getProductSnapshot, searchKb, type KbHit, type ProductHit } from "@/lib/support/tools";
 
-const MAX_TURNS = 6;
-const MAX_OUTPUT_TOKENS = 1500;
+const MAX_TURNS = 3;
+const MAX_OUTPUT_TOKENS = 1200;
+// Default to the non-thinking variant so compose fits inside Vercel Hobby's 10s
+// function budget. Override via NEOKENS_MODEL env when on Pro for the thinking model.
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = `You are a customer support reply assistant for Cafe Racer Garage (CRG), trading as Prime Moto Pty Ltd (Australian e-commerce, motorcycle electrical parts).
 
@@ -102,12 +110,13 @@ export interface ComposeResult {
   model: string;
   provider: "neokens" | "anthropic" | "error";
   errorMessage?: string;
+  conversationId?: string | null;
 }
 
 async function neokensConfig() {
   const apiKey = (await getCredentialValue("neokens", "NEOKENS_KEY")) ?? null;
   const baseUrl = ((await getCredentialValue("neokens", "NEOKENS_BASE_URL")) ?? "https://api.neokens.com/").replace(/\/+$/, "");
-  const model = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? "claude-sonnet-4-6-thinking";
+  const model = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? DEFAULT_MODEL;
   return { apiKey, baseUrl, model };
 }
 
@@ -165,7 +174,7 @@ function serializeProduct(p: ProductHit | null): string {
   ].join("\n");
 }
 
-export async function composeReply(customerMessage: string): Promise<ComposeResult> {
+export async function composeReply(customerMessage: string, opts?: { actor?: string }): Promise<ComposeResult> {
   const trace: ComposeTrace[] = [];
   const messages: AnthropicMessage[] = [
     {
@@ -175,6 +184,31 @@ export async function composeReply(customerMessage: string): Promise<ComposeResu
   ];
 
   const { model } = await neokensConfig();
+  const actor = opts?.actor ?? "support-hire";
+
+  const conversationId = await startConversation(customerMessage);
+  const activity = await recordActivity({
+    type: "compose",
+    actor,
+    summary: snippet(customerMessage, 120),
+    detail: { conversationId }
+  });
+
+  if (conversationId) {
+    await logMessage(conversationId, "user", customerMessage, {});
+  }
+
+  const finish = async (result: ComposeResult) => {
+    if (conversationId) {
+      await logMessage(conversationId, "assistant", result.reply || result.raw, {
+        model,
+        provider: result.provider,
+        errorMessage: result.errorMessage
+      });
+    }
+    await finalizeActivity(activity, result, conversationId);
+    return { ...result, conversationId: conversationId ?? null };
+  };
 
   for (let turn = 0; turn < MAX_TURNS; turn += 1) {
     let response: AnthropicResponse;
@@ -182,7 +216,7 @@ export async function composeReply(customerMessage: string): Promise<ComposeResu
       response = await callNeokens({ system: SYSTEM_PROMPT, tools: TOOLS, messages });
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : "Unknown Neokens error";
-      return { reply: "", raw: "", trace, model, provider: "error", errorMessage: errMsg };
+      return finish({ reply: "", raw: "", trace, model, provider: "error", errorMessage: errMsg });
     }
 
     const toolUses = response.content.filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use");
@@ -192,10 +226,9 @@ export async function composeReply(customerMessage: string): Promise<ComposeResu
         .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
         .map((b) => b.text)
         .join("\n\n");
-      return { reply: extractReply(text), raw: text, trace, model, provider: "neokens" };
+      return finish({ reply: extractReply(text), raw: text, trace, model, provider: "neokens" });
     }
 
-    // Carry the assistant's full content (text + tool_use blocks) so the next turn can reference them.
     messages.push({ role: "assistant", content: response.content });
 
     const toolResults: ContentBlock[] = [];
@@ -203,18 +236,87 @@ export async function composeReply(customerMessage: string): Promise<ComposeResu
       const { output, serialized } = await runTool(call.name, call.input);
       trace.push({ tool: call.name, input: call.input, output });
       toolResults.push({ type: "tool_result", tool_use_id: call.id, content: serialized });
+      if (conversationId) {
+        await logMessage(conversationId, "tool", serialized, {
+          toolName: call.name,
+          toolInput: call.input,
+          toolOutput: output
+        });
+      }
     }
     messages.push({ role: "user", content: toolResults });
   }
 
-  return {
+  return finish({
     reply: "",
     raw: "",
     trace,
     model,
     provider: "error",
     errorMessage: `Stopped after ${MAX_TURNS} turns without a final reply.`
-  };
+  });
+}
+
+async function startConversation(customerMessage: string): Promise<string | null> {
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const clientId = await upsertClient(seedClient);
+    const [row] = await db
+      .insert(supportConversations)
+      .values({ clientId, title: snippet(customerMessage, 80), status: "open" })
+      .returning({ id: supportConversations.id });
+    return row?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function logMessage(
+  conversationId: string,
+  role: "user" | "assistant" | "tool",
+  content: string,
+  extras: { toolName?: string; toolInput?: unknown; toolOutput?: unknown; model?: string; provider?: string; errorMessage?: string }
+): Promise<void> {
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.insert(supportMessages).values({
+      conversationId,
+      role,
+      content,
+      toolName: extras.toolName ?? null,
+      toolInput: (extras.toolInput ?? null) as never,
+      toolOutput: (extras.toolOutput ?? null) as never,
+      model: extras.model ?? null,
+      provider: extras.provider ?? null,
+      errorMessage: extras.errorMessage ?? null
+    });
+  } catch {
+    // swallow logging errors so they never break the compose path
+  }
+}
+
+async function finalizeActivity(handle: ActivityHandle, result: ComposeResult, conversationId: string | null): Promise<void> {
+  if (result.provider === "error") {
+    await handle.finish({
+      status: "error",
+      summary: result.errorMessage ?? "Compose failed",
+      detail: { conversationId, toolCalls: result.trace.length },
+      errorMessage: result.errorMessage
+    });
+    return;
+  }
+  await handle.finish({
+    status: "success",
+    summary: snippet(result.reply || result.raw, 120),
+    detail: { conversationId, toolCalls: result.trace.length, model: result.model }
+  });
+}
+
+function snippet(text: string, max: number): string {
+  const trimmed = text.replace(/\s+/g, " ").trim();
+  return trimmed.length > max ? trimmed.slice(0, max - 3) + "..." : trimmed;
 }
 
 function extractReply(raw: string): string {

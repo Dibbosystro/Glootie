@@ -3,7 +3,9 @@ import { requireAccess } from "@/lib/auth";
 import { composeReply } from "@/lib/support/agent";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+// Vercel Hobby plan caps server functions at 10s. Compose targets 3 tool rounds
+// + a fast non-thinking model so it fits within budget.
+export const maxDuration = 10;
 
 export async function POST(request: Request) {
   const denied = await requireAccess();

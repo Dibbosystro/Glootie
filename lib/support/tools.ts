@@ -21,8 +21,10 @@ export interface ProductHit {
   status: string;
 }
 
-// Returns up to 5 KB sections whose markdown contains the query terms.
-// For a small KB (<20 articles) ILIKE is cheaper and simpler than tsvector.
+// Returns up to 5 KB sections matching the query. Tries Postgres FTS (tsvector
+// + plainto_tsquery, English stemming) first for recall on plural/stem variants,
+// then falls back to ILIKE on the same query string so the search still works
+// in the brief window before the FTS trigger has populated content_tsv.
 export async function searchKb(query: string): Promise<KbHit[]> {
   const db = getDb();
   const trimmed = query.trim();
@@ -30,20 +32,42 @@ export async function searchKb(query: string): Promise<KbHit[]> {
   if (!db) return [];
 
   const clientId = await upsertClient(seedClient);
+
+  try {
+    const ftsRows = await db.execute<{ slug: string; title: string; snippet: string }>(sql`
+      SELECT slug, title,
+             ts_headline('english', content_md, plainto_tsquery('english', ${trimmed}),
+               'MaxFragments=2, MaxWords=40, MinWords=18, StartSel=, StopSel=') AS snippet
+      FROM kb_documents
+      WHERE client_id = ${clientId}
+        AND content_tsv @@ plainto_tsquery('english', ${trimmed})
+      ORDER BY ts_rank(content_tsv, plainto_tsquery('english', ${trimmed})) DESC
+      LIMIT 5
+    `);
+    const rows = Array.isArray(ftsRows) ? ftsRows : ftsRows.rows;
+    if (rows && rows.length > 0) {
+      return rows.map((row) => ({
+        slug: row.slug,
+        title: row.title,
+        snippet: cleanSnippet(row.snippet)
+      }));
+    }
+  } catch {
+    // tsv column or trigger may not be installed yet; fall through to ILIKE.
+  }
+
   const tokens = trimmed
     .split(/\s+/)
     .map((t) => t.replace(/[^a-zA-Z0-9.\-]/g, ""))
     .filter((t) => t.length >= 2);
-
   if (tokens.length === 0) return [];
 
-  const rows = await db
+  const ilikeRows = await db
     .select({ slug: kbDocuments.slug, title: kbDocuments.title, contentMd: kbDocuments.contentMd })
     .from(kbDocuments)
-    .where(and(eq(kbDocuments.clientId, clientId), or(...tokens.map((t) => ilike(kbDocuments.contentMd, `%${t}%`))) ));
+    .where(and(eq(kbDocuments.clientId, clientId), or(...tokens.map((t) => ilike(kbDocuments.contentMd, `%${t}%`)))));
 
-  // Score by how many tokens match, then build a snippet around the first hit.
-  const scored = rows
+  const scored = ilikeRows
     .map((row) => {
       const lower = row.contentMd.toLowerCase();
       let score = 0;
@@ -67,6 +91,11 @@ export async function searchKb(query: string): Promise<KbHit[]> {
     void score;
     return rest;
   });
+}
+
+function cleanSnippet(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return raw.replace(/\s+/g, " ").trim();
 }
 
 // Live product + stock lookup. Falls back to seed data when DB is empty (cold-start).

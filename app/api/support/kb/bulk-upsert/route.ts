@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { timingSafeEqual } from "node:crypto";
 import { bulkUpsertKbArticles, type KbArticleInput } from "@/lib/support/kb";
+import { recordActivity } from "@/lib/support/activity";
 import { getServerEnv } from "@/lib/server-env";
 
 function checkApiKey(provided: string | null | undefined): boolean {
@@ -40,13 +41,33 @@ export async function POST(request: Request) {
     }
   }
 
+  const activity = await recordActivity({
+    type: "kb_push",
+    actor: body.editor ?? "cli",
+    summary: `KB push: ${articles.length} articles`,
+    detail: { slugs: articles.map((a) => a.slug) }
+  });
+
   try {
     const results = await bulkUpsertKbArticles(articles, body.editor ?? "cli");
     revalidatePath("/support/kb");
     revalidatePath("/support");
+    const counts = results.reduce(
+      (acc, r) => {
+        acc[r.status] = (acc[r.status] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+    await activity.finish({
+      status: "success",
+      summary: `KB push: ${results.length} articles (created=${counts.created ?? 0}, updated=${counts.updated ?? 0}, unchanged=${counts.unchanged ?? 0})`,
+      detail: { results }
+    });
     return NextResponse.json({ results });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    await activity.finish({ status: "error", summary: "KB push failed", errorMessage: message });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
