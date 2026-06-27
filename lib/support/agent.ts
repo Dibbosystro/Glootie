@@ -6,24 +6,27 @@ import { getCredentialValue } from "@/lib/db/credentials";
 import { upsertClient } from "@/lib/db/persistence";
 import { seedClient } from "@/lib/seed";
 import { recordActivity, type ActivityHandle } from "@/lib/support/activity";
-import { searchKb, type KbHit } from "@/lib/support/tools";
+import { getProductSnapshot, searchKb, type KbHit, type ProductHit } from "@/lib/support/tools";
 import { searchProductsLive, type LiveProduct } from "@/lib/integrations/shopify";
 
+// One optional tool round then a forced plain-text answer. Tools are ALWAYS sent
+// in the request: this Neokens "thinking" model hangs if `tools` is omitted, so we
+// keep them present and instead steer the model to answer from the pre-fetched
+// grounding rather than relying on it to call tools.
+const MAX_TURNS = 2;
 const MAX_OUTPUT_TOKENS = 1200;
 // Neokens only exposes the "-thinking" model ids, so the default must be one too.
-// Latency is absorbed by maxDuration=60 (Fluid Compute) + a single grounded call.
+// Latency is absorbed by maxDuration=60 (Fluid Compute) + pre-fetched grounding.
 const DEFAULT_MODEL = "claude-sonnet-4-6-thinking";
 
-// Retrieve-then-generate: we pre-fetch the KB + live product data ourselves and
-// hand it to the model, then take a single no-tools completion. This avoids the
-// agentic tool loop (the Neokens gateway mis-handles tool-use for the thinking
-// model, looping or leaking raw tool-call XML), and keeps latency predictable.
 const SYSTEM_PROMPT = `You are a customer support reply assistant for Cafe Racer Garage (CRG), trading as Prime Moto Pty Ltd (Australian e-commerce, motorcycle electrical parts).
 
 You will receive a customer message plus GROUNDING (knowledge-base snippets and live Shopify product/stock already retrieved for you). Draft a short reply the human agent will review and send.
 
+You also have two fallback tools, search_kb and get_product, but the GROUNDING usually has everything. Prefer the grounding. Only call a tool if a needed fact is genuinely missing from it, then write the reply.
+
 Rules:
-- Ground every fact in the GROUNDING. If a needed fact is not there, do NOT invent it. Instead write a brief "I will confirm that with the team and get back to you".
+- Ground every fact in the GROUNDING (or a tool result). If a needed fact is unavailable, do NOT invent it. Write a brief "I will confirm that with the team and get back to you".
 - No em dashes or en dashes. Use commas, full stops, parentheses. Numeric ranges use a hyphen (10-20).
 - Never say "discontinued". For no stock say "currently out of stock", or "I will let you know as soon as it is back in stock" if there is no restock date.
 - Never reveal the Robina address. Public address only: lvl 3, 315 E / 3 Oracle Bvd, Broadbeach QLD 4218, Australia.
@@ -35,14 +38,46 @@ Output: reply with ONLY the message text to send the customer. Plain text. No ma
 Example of the exact output style:
 Hi mate, yes the X3.M is in stock and ready to ship. It is 245 AUD. Shipping within Australia takes 3 to 7 business days. Let me know if you want a hand picking the right loom for your build.`;
 
-interface AnthropicTextBlock {
-  type: string;
-  text?: string;
+interface ToolDef {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+const TOOLS: ToolDef[] = [
+  {
+    name: "search_kb",
+    description: "Fallback KB search. Returns up to 5 article slugs with snippets. Only use if the grounding is missing a policy/FAQ fact you need.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "2 to 6 keywords like 'shipping australia' or 'TC3.P fitment'." } },
+      required: ["query"]
+    }
+  },
+  {
+    name: "get_product",
+    description: "Fallback product lookup by SKU, handle, or partial title. Returns live price, inventory quantity, and status. Only use if the grounding lacks the product.",
+    input_schema: {
+      type: "object",
+      properties: { idOrHandleOrTitle: { type: "string", description: "SKU like 'TC3.P', a handle, or a product name fragment." } },
+      required: ["idOrHandleOrTitle"]
+    }
+  }
+];
+
+type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_result"; tool_use_id: string; content: string };
+
+interface AnthropicMessage {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
 }
 
 interface AnthropicResponse {
-  content: AnthropicTextBlock[];
-  stop_reason?: string;
+  content: ContentBlock[];
+  stop_reason: string;
 }
 
 export interface ComposeTrace {
@@ -64,7 +99,6 @@ export interface ComposeResult {
 async function neokensConfig() {
   const apiKey = (await getCredentialValue("neokens", "NEOKENS_KEY")) ?? null;
   const baseUrl = ((await getCredentialValue("neokens", "NEOKENS_BASE_URL")) ?? "https://api.neokens.com/").replace(/\/+$/, "");
-  // Use the Neokens-configured model as-is (Neokens only recognises the "-thinking" ids).
   const model = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? DEFAULT_MODEL;
   return { apiKey, baseUrl, model };
 }
@@ -81,7 +115,8 @@ async function callNeokens(payload: Record<string, unknown>): Promise<AnthropicR
       "anthropic-version": "2023-06-01",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ model, max_tokens: MAX_OUTPUT_TOKENS, ...payload })
+    // tools are always included: this model hangs when they are omitted.
+    body: JSON.stringify({ model, max_tokens: MAX_OUTPUT_TOKENS, tools: TOOLS, ...payload })
   });
 
   if (!res.ok) {
@@ -89,6 +124,31 @@ async function callNeokens(payload: Record<string, unknown>): Promise<AnthropicR
     throw new Error(`Neokens ${res.status}: ${text.slice(0, 500)}`);
   }
   return (await res.json()) as AnthropicResponse;
+}
+
+async function runTool(name: string, input: Record<string, unknown>): Promise<{ output: unknown; serialized: string }> {
+  if (name === "search_kb") {
+    const query = typeof input.query === "string" ? input.query : "";
+    const hits = await searchKb(query);
+    return { output: hits, serialized: serializeKbHits(hits) };
+  }
+  if (name === "get_product") {
+    const needle = typeof input.idOrHandleOrTitle === "string" ? input.idOrHandleOrTitle : "";
+    const hit = await getProductSnapshot(needle);
+    return { output: hit, serialized: serializeProduct(hit) };
+  }
+  return { output: null, serialized: `Unknown tool: ${name}` };
+}
+
+function serializeKbHits(hits: KbHit[]): string {
+  if (hits.length === 0) return "No KB matches.";
+  return hits.map((h) => `[${h.slug}] ${h.title}\n${h.snippet}`).join("\n\n---\n\n");
+}
+
+function serializeProduct(p: ProductHit | null): string {
+  if (!p) return "No product matched.";
+  const stockLine = p.inventoryQty <= 0 ? "currently out of stock" : `${p.inventoryQty} in stock`;
+  return [`Title: ${p.title}`, `Handle: ${p.handle}`, `SKU/ShopifyId: ${p.shopifyId}`, `Status: ${p.status}`, `Price (AUD): ${p.price}`, `Stock: ${stockLine}`].join("\n");
 }
 
 // Stop words stripped from the customer message before the live product search,
@@ -133,10 +193,17 @@ function formatGrounding(kb: KbHit[], products: LiveProduct[]): string {
   return parts.join("\n\n");
 }
 
+function textOf(response: AnthropicResponse): string {
+  return response.content
+    .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
+    .map((b) => b.text)
+    .join("\n\n");
+}
+
 export async function composeReply(customerMessage: string, opts?: { actor?: string }): Promise<ComposeResult> {
   const trace: ComposeTrace[] = [];
 
-  // Pre-fetch grounding (KB + live Shopify) so a single model call can answer.
+  // Pre-fetch grounding (KB + live Shopify) so the common case is one model call.
   const [kbHits, productHits] = await Promise.all([
     searchKb(customerMessage).catch(() => [] as KbHit[]),
     searchProductsLive(productQueryFrom(customerMessage), 3).catch(() => [] as LiveProduct[])
@@ -144,55 +211,67 @@ export async function composeReply(customerMessage: string, opts?: { actor?: str
   trace.push({ tool: "search_kb", input: { query: customerMessage }, output: kbHits });
   trace.push({ tool: "get_product", input: { query: productQueryFrom(customerMessage) }, output: productHits });
 
-  const userContent =
-    `A customer just sent the following message. Draft my reply.\n\nCUSTOMER MESSAGE:\n${customerMessage.trim()}` +
-    `\n\nGROUNDING (already retrieved for you; use only this):\n${formatGrounding(kbHits, productHits)}`;
+  const messages: AnthropicMessage[] = [
+    {
+      role: "user",
+      content:
+        `A customer just sent the following message. Draft my reply.\n\nCUSTOMER MESSAGE:\n${customerMessage.trim()}` +
+        `\n\nGROUNDING (already retrieved for you; use this and avoid calling tools unless a needed fact is missing):\n${formatGrounding(kbHits, productHits)}` +
+        `\n\nWrite the reply now as plain text.`
+    }
+  ];
 
   const { model } = await neokensConfig();
   const actor = opts?.actor ?? "support-hire";
 
   const conversationId = await startConversation(customerMessage);
-  const activity = await recordActivity({
-    type: "compose",
-    actor,
-    summary: snippet(customerMessage, 120),
-    detail: { conversationId }
-  });
+  const activity = await recordActivity({ type: "compose", actor, summary: snippet(customerMessage, 120), detail: { conversationId } });
   if (conversationId) await logMessage(conversationId, "user", customerMessage, {});
 
   const finish = async (result: ComposeResult) => {
     if (conversationId) {
-      await logMessage(conversationId, "assistant", result.reply || result.raw, {
-        model,
-        provider: result.provider,
-        errorMessage: result.errorMessage
-      });
+      await logMessage(conversationId, "assistant", result.reply || result.raw, { model, provider: result.provider, errorMessage: result.errorMessage });
     }
     await finalizeActivity(activity, result, conversationId);
     return { ...result, conversationId: conversationId ?? null };
   };
 
-  let response: AnthropicResponse;
-  try {
-    response = await callNeokens({
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }]
-    });
-  } catch (error) {
-    const errMsg = error instanceof Error ? error.message : "Unknown Neokens error";
-    return finish({ reply: "", raw: "", trace, model, provider: "error", errorMessage: errMsg });
+  let lastText = "";
+  for (let turn = 0; turn < MAX_TURNS; turn += 1) {
+    let response: AnthropicResponse;
+    try {
+      response = await callNeokens({ system: SYSTEM_PROMPT, messages });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Unknown Neokens error";
+      return finish({ reply: "", raw: "", trace, model, provider: "error", errorMessage: errMsg });
+    }
+
+    const toolUses = response.content.filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use");
+    const text = textOf(response);
+    if (text.trim()) lastText = text;
+
+    if (toolUses.length === 0 || response.stop_reason !== "tool_use") {
+      if (text.trim()) return finish({ reply: sanitizeReply(text), raw: text, trace, model, provider: "neokens" });
+      break;
+    }
+
+    messages.push({ role: "assistant", content: response.content });
+    const toolResults: ContentBlock[] = [];
+    for (const call of toolUses) {
+      const { output, serialized } = await runTool(call.name, call.input);
+      trace.push({ tool: call.name, input: call.input, output });
+      toolResults.push({ type: "tool_result", tool_use_id: call.id, content: serialized });
+      if (conversationId) await logMessage(conversationId, "tool", serialized, { toolName: call.name, toolInput: call.input, toolOutput: output });
+    }
+    // Same user turn carries the tool results plus a nudge to answer now.
+    toolResults.push({ type: "text", text: "You now have the tool results and the grounding. Write the final customer reply now as plain text. Do not call any more tools." } as ContentBlock);
+    messages.push({ role: "user", content: toolResults });
   }
 
-  const text = response.content
-    .filter((b) => b.type === "text" && typeof b.text === "string")
-    .map((b) => b.text as string)
-    .join("\n\n");
-
-  if (!text.trim()) {
-    return finish({ reply: "", raw: "", trace, model, provider: "error", errorMessage: "Empty model response." });
+  if (lastText.trim()) {
+    return finish({ reply: sanitizeReply(lastText), raw: lastText, trace, model, provider: "neokens" });
   }
-
-  return finish({ reply: sanitizeReply(text), raw: text, trace, model, provider: "neokens" });
+  return finish({ reply: "", raw: "", trace, model, provider: "error", errorMessage: "The model did not return a reply. Try again." });
 }
 
 async function startConversation(customerMessage: string): Promise<string | null> {
@@ -237,19 +316,10 @@ async function logMessage(
 
 async function finalizeActivity(handle: ActivityHandle, result: ComposeResult, conversationId: string | null): Promise<void> {
   if (result.provider === "error") {
-    await handle.finish({
-      status: "error",
-      summary: result.errorMessage ?? "Compose failed",
-      detail: { conversationId, toolCalls: result.trace.length },
-      errorMessage: result.errorMessage
-    });
+    await handle.finish({ status: "error", summary: result.errorMessage ?? "Compose failed", detail: { conversationId, toolCalls: result.trace.length }, errorMessage: result.errorMessage });
     return;
   }
-  await handle.finish({
-    status: "success",
-    summary: snippet(result.reply || result.raw, 120),
-    detail: { conversationId, toolCalls: result.trace.length, model: result.model }
-  });
+  await handle.finish({ status: "success", summary: snippet(result.reply || result.raw, 120), detail: { conversationId, toolCalls: result.trace.length, model: result.model } });
 }
 
 function snippet(text: string, max: number): string {
@@ -266,7 +336,7 @@ function sanitizeReply(text: string): string {
   t = t.replace(/<\/?(invoke|parameter|tool_call|function_calls|antml:[a-z_]+)[^>]*>/gi, "");
   // 2. strip leftover structured-format labels from the old prompt
   t = t.replace(/^\s*(REPLY|CITATIONS|CONFIDENCE|NEEDS HUMAN INPUT)\s*:.*$/gim, "");
-  // 3. strip markdown noise (do this before the Notes strip so it sees clean lines)
+  // 3. strip markdown noise (before the Notes strip so it sees clean lines)
   t = t.replace(/^\s*-{3,}\s*$/gm, ""); // horizontal rules
   t = t.replace(/^\s*>\s?/gm, ""); // blockquote markers
   t = t.replace(/^#{1,6}\s+/gm, ""); // headings
@@ -278,10 +348,7 @@ function sanitizeReply(text: string): string {
   // 5. brand hard rules
   t = t.replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2").replace(/\s*[–—]\s*/g, ", ");
   t = t.replace(/\bdiscontinued\b/gi, "currently out of stock");
-  t = t.replace(
-    /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}]/gu,
-    ""
-  );
+  t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}]/gu, "");
   // 6. tidy whitespace
   t = t.replace(/[ \t]{2,}/g, " ").replace(/ +([.,!?;:])/g, "$1").replace(/\n{3,}/g, "\n\n").trim();
   return t;
