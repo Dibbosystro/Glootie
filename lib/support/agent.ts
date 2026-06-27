@@ -9,7 +9,9 @@ import { recordActivity, type ActivityHandle } from "@/lib/support/activity";
 import { getProductSnapshot, searchKb, type KbHit, type ProductHit } from "@/lib/support/tools";
 import { searchProductsLive, type LiveProduct } from "@/lib/integrations/shopify";
 
-const MAX_TURNS = 3;
+// One tool round (the model can call several tools at once), then a forced
+// no-tools answer. With grounding pre-fetched, most replies need zero tool rounds.
+const MAX_TURNS = 1;
 const MAX_OUTPUT_TOKENS = 1200;
 // Neokens only exposes the "-thinking" model ids, so the default must be one too.
 // Latency is absorbed by maxDuration=60 (Fluid Compute) + pre-fetched grounding.
@@ -36,21 +38,13 @@ Call tools when relevant. It is fine to call multiple tools before writing the r
 5. Currency in customer-facing copy: AUD (default Shopify storefront).
 6. If stock truth contradicts the KB, trust the live get_product result. The KB is an older snapshot; product data is live from Shopify.
 
-# Output format
+# Output
 
-Respond in this exact structure:
-
-REPLY:
-<the reply text to paste back to the customer>
-
-CITATIONS:
-<list the KB slugs and product handles you used, one per line. If none, write "none">
-
-CONFIDENCE: high | medium | low
-<one-line reason. Medium or low means the human should verify before sending.>
-
-NEEDS HUMAN INPUT:
-<list any facts you did not have. If nothing missing, write "none">`;
+Reply with ONLY the message text to send the customer. Plain text. No markdown headers,
+horizontal rules, or bold. No greeting placeholder like [Your Name], no email subject line,
+no sign-off, and do not ask me whether to adjust it. Keep it short. If a needed fact is not
+in the grounding, fold a brief "I will confirm that with the team and get back to you" into
+the reply rather than guessing.`;
 
 interface ToolDef {
   name: string;
@@ -286,6 +280,23 @@ export async function composeReply(customerMessage: string, opts?: { actor?: str
       }
     }
     messages.push({ role: "user", content: toolResults });
+  }
+
+  // The model used its tool budget without writing a reply (thinking models can
+  // loop on tools). Force one final call with NO tools so it must answer from the
+  // grounding + tool results already gathered.
+  try {
+    const forced = await callNeokens({ system: SYSTEM_PROMPT, messages });
+    const text = forced.content
+      .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
+      .map((b) => b.text)
+      .join("\n\n");
+    if (text.trim()) {
+      return finish({ reply: enforceBrandRules(extractReply(text)), raw: text, trace, model, provider: "neokens" });
+    }
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : "Unknown Neokens error";
+    return finish({ reply: "", raw: "", trace, model, provider: "error", errorMessage: errMsg });
   }
 
   return finish({
