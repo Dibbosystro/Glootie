@@ -1,7 +1,17 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/support/kb/bulk-upsert", "/_next", "/favicon.ico"];
+// /api/support/compose is allowlisted so machine callers (ManyChat External
+// Request, n8n) can reach it with a SUPPORT_API_KEY bearer; the handler still
+// enforces cookie-or-bearer auth, same as bulk-upsert.
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/support/kb/bulk-upsert",
+  "/api/support/compose",
+  "/_next",
+  "/favicon.ico"
+];
 
 export function middleware(request: NextRequest) {
   const passwordEnabled = Boolean(process.env.APP_ACCESS_PASSWORD);
