@@ -343,10 +343,12 @@ function sanitizeReply(text: string): string {
   t = t.replace(/\*\*(.*?)\*\*/g, "$1").replace(/(?<!\w)\*(?!\s)(.*?)(?<!\s)\*(?!\w)/g, "$1");
   t = t.replace(/__(.*?)__/g, "$1");
   t = t.replace(/\*\*|`/g, "");
-  // 4. drop a trailing "Notes for you ..." personalisation block the model adds
+  // 4. drop a trailing "Notes for you ..." block and a sign-off the model adds
   t = t.replace(/\n\s*notes?\b\s*(for|to|:)[\s\S]*$/i, "");
+  t = t.replace(/\n+\s*(cheers|regards|best regards|best|kind regards|warm regards|sincerely|many thanks)\b[,.!]*\s*(\n+.{0,40})?\s*$/i, "");
   // 5. brand hard rules
   t = t.replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2").replace(/\s*[–—]\s*/g, ", ");
+  t = t.replace(/!+/g, "."); // CRG voice: no exclamation marks
   t = t.replace(/\bdiscontinued\b/gi, "currently out of stock");
   t = t.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}]/gu, "");
   // 6. tidy whitespace
