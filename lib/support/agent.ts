@@ -11,9 +11,9 @@ import { searchProductsLive, type LiveProduct } from "@/lib/integrations/shopify
 
 const MAX_TURNS = 3;
 const MAX_OUTPUT_TOKENS = 1200;
-// Default to the non-thinking variant so compose fits inside Vercel Hobby's 10s
-// function budget. Override via NEOKENS_MODEL env when on Pro for the thinking model.
-const DEFAULT_MODEL = "claude-sonnet-4-6";
+// Neokens only exposes the "-thinking" model ids, so the default must be one too.
+// Latency is absorbed by maxDuration=60 (Fluid Compute) + pre-fetched grounding.
+const DEFAULT_MODEL = "claude-sonnet-4-6-thinking";
 
 const SYSTEM_PROMPT = `You are a customer support reply assistant for Cafe Racer Garage (CRG), trading as Prime Moto Pty Ltd (Australian e-commerce, motorcycle electrical parts).
 
@@ -117,10 +117,9 @@ export interface ComposeResult {
 async function neokensConfig() {
   const apiKey = (await getCredentialValue("neokens", "NEOKENS_KEY")) ?? null;
   const baseUrl = ((await getCredentialValue("neokens", "NEOKENS_BASE_URL")) ?? "https://api.neokens.com/").replace(/\/+$/, "");
-  const rawModel = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? DEFAULT_MODEL;
-  // Force the non-thinking variant: thinking adds ~2-3x latency for little gain on a
-  // short, grounded support draft, and the reply must fit the function + ManyChat budgets.
-  const model = rawModel.replace(/-thinking$/i, "");
+  // Use the Neokens-configured model as-is (Neokens only recognises the "-thinking"
+  // ids). Latency is covered by maxDuration=60 + grounding pre-fetch + MAX_TURNS.
+  const model = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? DEFAULT_MODEL;
   return { apiKey, baseUrl, model };
 }
 
