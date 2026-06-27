@@ -9,7 +9,7 @@ import { recordActivity, type ActivityHandle } from "@/lib/support/activity";
 import { getProductSnapshot, searchKb, type KbHit, type ProductHit } from "@/lib/support/tools";
 import { searchProductsLive, type LiveProduct } from "@/lib/integrations/shopify";
 
-const MAX_TURNS = 2;
+const MAX_TURNS = 3;
 const MAX_OUTPUT_TOKENS = 1200;
 // Default to the non-thinking variant so compose fits inside Vercel Hobby's 10s
 // function budget. Override via NEOKENS_MODEL env when on Pro for the thinking model.
@@ -117,7 +117,10 @@ export interface ComposeResult {
 async function neokensConfig() {
   const apiKey = (await getCredentialValue("neokens", "NEOKENS_KEY")) ?? null;
   const baseUrl = ((await getCredentialValue("neokens", "NEOKENS_BASE_URL")) ?? "https://api.neokens.com/").replace(/\/+$/, "");
-  const model = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? DEFAULT_MODEL;
+  const rawModel = (await getCredentialValue("neokens", "NEOKENS_MODEL")) ?? DEFAULT_MODEL;
+  // Force the non-thinking variant: thinking adds ~2-3x latency for little gain on a
+  // short, grounded support draft, and the reply must fit the function + ManyChat budgets.
+  const model = rawModel.replace(/-thinking$/i, "");
   return { apiKey, baseUrl, model };
 }
 
@@ -265,7 +268,7 @@ export async function composeReply(customerMessage: string, opts?: { actor?: str
         .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
         .map((b) => b.text)
         .join("\n\n");
-      return finish({ reply: extractReply(text), raw: text, trace, model, provider: "neokens" });
+      return finish({ reply: enforceBrandRules(extractReply(text)), raw: text, trace, model, provider: "neokens" });
     }
 
     messages.push({ role: "assistant", content: response.content });
@@ -361,4 +364,21 @@ function snippet(text: string, max: number): string {
 function extractReply(raw: string): string {
   const replyMatch = raw.match(/REPLY:\s*\n?([\s\S]*?)(?:\n\s*CITATIONS:|$)/i);
   return (replyMatch?.[1] ?? raw).trim();
+}
+
+// Hard brand rules enforced deterministically, regardless of what the model emits:
+// no em/en dashes (numeric ranges keep a hyphen), no emoji, never "discontinued".
+function enforceBrandRules(text: string): string {
+  return text
+    .replace(/(\d)\s*[–—]\s*(\d)/g, "$1-$2")
+    .replace(/\s*[–—]\s*/g, ", ")
+    .replace(/\bdiscontinued\b/gi, "currently out of stock")
+    .replace(
+      /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}]/gu,
+      ""
+    )
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +([.,!?;:])/g, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
