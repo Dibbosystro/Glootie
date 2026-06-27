@@ -3,7 +3,9 @@ import { requireAccess } from "@/lib/auth";
 import { listOpenWaiting } from "@/lib/integrations/chatway";
 
 export const runtime = "nodejs";
-export const maxDuration = 10;
+// Scans several conversation pages + parallel last-message fetches; ask for 60s
+// (Fluid Compute extends Hobby; clamps harmlessly otherwise).
+export const maxDuration = 60;
 
 function clamp(n: number, min: number, max: number): number {
   if (!Number.isFinite(n)) return min;

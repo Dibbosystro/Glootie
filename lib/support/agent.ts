@@ -7,8 +7,9 @@ import { upsertClient } from "@/lib/db/persistence";
 import { seedClient } from "@/lib/seed";
 import { recordActivity, type ActivityHandle } from "@/lib/support/activity";
 import { getProductSnapshot, searchKb, type KbHit, type ProductHit } from "@/lib/support/tools";
+import { searchProductsLive, type LiveProduct } from "@/lib/integrations/shopify";
 
-const MAX_TURNS = 3;
+const MAX_TURNS = 2;
 const MAX_OUTPUT_TOKENS = 1200;
 // Default to the non-thinking variant so compose fits inside Vercel Hobby's 10s
 // function budget. Override via NEOKENS_MODEL env when on Pro for the thinking model.
@@ -174,12 +175,50 @@ function serializeProduct(p: ProductHit | null): string {
   ].join("\n");
 }
 
+function formatGrounding(kb: KbHit[], products: LiveProduct[]): string {
+  const parts: string[] = [];
+  if (kb.length > 0) {
+    parts.push(
+      "KB MATCHES:\n" + kb.map((h) => `- [${h.slug}] ${h.title}: ${h.snippet}`).join("\n")
+    );
+  }
+  if (products.length > 0) {
+    parts.push(
+      "LIVE SHOPIFY PRODUCTS:\n" +
+        products
+          .map((p) => {
+            const stock = p.inventoryQty <= 0 ? "currently out of stock" : `${p.inventoryQty} in stock`;
+            return `- ${p.title} (${p.handle}) | AUD ${p.price} | ${p.status} | ${stock}`;
+          })
+          .join("\n")
+    );
+  }
+  if (parts.length === 0) {
+    return "Nothing was pre-retrieved for this message. Use the tools if you need grounding; if a fact is unavailable, say you will check with the team.";
+  }
+  return parts.join("\n\n");
+}
+
 export async function composeReply(customerMessage: string, opts?: { actor?: string }): Promise<ComposeResult> {
   const trace: ComposeTrace[] = [];
+
+  // Pre-fetch grounding so the common case resolves in a single model round-trip
+  // (fits Vercel's 10s budget) and every answer is grounded, not improvised.
+  const [kbHits, productHits] = await Promise.all([
+    searchKb(customerMessage).catch(() => [] as KbHit[]),
+    searchProductsLive(customerMessage, 3).catch(() => [] as LiveProduct[])
+  ]);
+  trace.push({ tool: "search_kb (prefetch)", input: { query: customerMessage }, output: kbHits });
+  if (productHits.length > 0) {
+    trace.push({ tool: "get_product (prefetch)", input: { query: customerMessage }, output: productHits });
+  }
+
   const messages: AnthropicMessage[] = [
     {
       role: "user",
-      content: `A customer just sent the following message. Draft my reply.\n\nCUSTOMER MESSAGE:\n${customerMessage.trim()}`
+      content:
+        `A customer just sent the following message. Draft my reply.\n\nCUSTOMER MESSAGE:\n${customerMessage.trim()}` +
+        `\n\nGROUNDING (already retrieved for you. Prefer this. Only call a tool if you need something not here):\n${formatGrounding(kbHits, productHits)}`
     }
   ];
 

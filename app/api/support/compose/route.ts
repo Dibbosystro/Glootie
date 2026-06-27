@@ -6,9 +6,10 @@ import { getServerEnv } from "@/lib/server-env";
 import { composeReply } from "@/lib/support/agent";
 
 export const runtime = "nodejs";
-// Vercel Hobby plan caps server functions at 10s. Compose targets 3 tool rounds
-// + a fast non-thinking model so it fits within budget.
-export const maxDuration = 10;
+// Grounding is pre-fetched in composeReply so the common case is a single model
+// round-trip. We still ask for 60s (Fluid Compute extends Hobby past the 10s
+// default; it clamps harmlessly if not available) to absorb cold starts + a tool round.
+export const maxDuration = 60;
 
 // Machine callers (ManyChat External Request, n8n) authenticate with the
 // SUPPORT_API_KEY bearer; the in-app inbox uses the login cookie. Same key the
