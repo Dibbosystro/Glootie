@@ -281,6 +281,117 @@ async function getShopifyAccessToken() {
   return (await getCredentialValue("shopify", "SHOPIFY_ADMIN_ACCESS_TOKEN")) || getServerEnv("SHOPIFY_CRG_TOKEN");
 }
 
+// Public storefront domain, used to build product links a human can paste to a
+// customer. CRG's storefront is caferacergarageshop.com (verified); override via
+// SHOPIFY_CRG_STOREFRONT. Falls back to the admin/myshopify domain if neither set.
+export async function getStorefrontDomain(): Promise<string> {
+  const explicit = (await getCredentialValue("shopify", "SHOPIFY_STOREFRONT_DOMAIN")) || getServerEnv("SHOPIFY_CRG_STOREFRONT");
+  if (explicit) return explicit.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return "caferacergarageshop.com";
+}
+
+export async function productUrl(handle: string): Promise<string> {
+  const domain = await getStorefrontDomain();
+  return `https://${domain}/products/${handle}`;
+}
+
+export interface LiveProduct {
+  title: string;
+  handle: string;
+  shopifyId: string;
+  price: string;
+  inventoryQty: number;
+  status: "active" | "draft" | "archived";
+}
+
+interface ShopifyGraphProductNode {
+  legacyResourceId: string;
+  title: string;
+  handle: string;
+  status: string;
+  totalInventory: number | null;
+  variants: { nodes: Array<{ price: string; sku: string | null; inventoryQuantity: number | null }> };
+}
+
+function mapGraphProduct(node: ShopifyGraphProductNode): LiveProduct {
+  const variants = node.variants?.nodes ?? [];
+  const firstVariant = variants[0];
+  const inventoryQty =
+    typeof node.totalInventory === "number"
+      ? node.totalInventory
+      : variants.reduce((sum, v) => sum + Number(v.inventoryQuantity || 0), 0);
+  const statusLower = (node.status || "").toLowerCase();
+  const status = statusLower === "draft" || statusLower === "archived" ? statusLower : "active";
+  return {
+    title: node.title,
+    handle: node.handle,
+    shopifyId: String(node.legacyResourceId),
+    price: String(firstVariant?.price ?? "0"),
+    inventoryQty,
+    status
+  };
+}
+
+// Real-time product search straight from Shopify Admin GraphQL (no DB snapshot),
+// so replies quote current price/stock/status. Returns [] on no match or error.
+export async function searchProductsLive(idOrHandleOrTitle: string, limit = 5): Promise<LiveProduct[]> {
+  const needle = idOrHandleOrTitle.trim();
+  if (!needle) return [];
+  const shop = await getShopifyStoreDomain();
+  const token = await getShopifyAccessToken();
+  if (!shop || !token) return [];
+
+  const esc = needle.replace(/["\\]/g, " ").trim();
+  if (!esc) return [];
+  const q = /\s/.test(esc) ? esc : `${esc} OR sku:${esc} OR handle:${esc}`;
+  const query = `query ProductLookup($q: String!, $n: Int!) {
+    products(first: $n, query: $q) {
+      nodes {
+        legacyResourceId
+        title
+        handle
+        status
+        totalInventory
+        variants(first: 50) { nodes { price sku inventoryQuantity } }
+      }
+    }
+  }`;
+
+  try {
+    const res = await fetch(`https://${shop}/admin/api/2026-01/graphql.json`, {
+      method: "POST",
+      headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ query, variables: { q, n: Math.max(1, Math.min(limit, 20)) } })
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      data?: { products?: { nodes?: ShopifyGraphProductNode[] } };
+      errors?: unknown;
+    };
+    if (json.errors) return [];
+    return (json.data?.products?.nodes ?? []).map(mapGraphProduct);
+  } catch {
+    return [];
+  }
+}
+
+// Single best match, for the support agent's get_product tool.
+export async function fetchSingleProductLive(idOrHandleOrTitle: string): Promise<LiveProduct | null> {
+  const hits = await searchProductsLive(idOrHandleOrTitle, 1);
+  return hits[0] ?? null;
+}
+
+// Live matches plus their public storefront URLs, for the inbox product picker.
+export async function searchProductsWithUrls(
+  q: string,
+  limit = 5
+): Promise<Array<LiveProduct & { url: string }>> {
+  const hits = await searchProductsLive(q, limit);
+  const domain = await getStorefrontDomain();
+  return hits.map((p) => ({ ...p, url: `https://${domain}/products/${p.handle}` }));
+}
+
 function fallbackProductImage(title: string) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><rect width="240" height="240" fill="#f5f5f4"/><circle cx="120" cy="120" r="72" fill="#b45309" opacity=".16"/><text x="120" y="126" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#1c1917">${escapeSvg(title.slice(0, 2).toUpperCase())}</text></svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;

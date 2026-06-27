@@ -11,6 +11,7 @@ import {
   CalendarDays,
   Home,
   ImageIcon,
+  Inbox,
   LineChart,
   MessageSquare,
   Menu,
@@ -39,6 +40,7 @@ const studioNav = [
 ];
 
 const supportNav = [
+  { href: "/support/inbox", label: "Chatway Inbox", icon: Inbox },
   { href: "/support", label: "Reply Composer", icon: MessageSquare, exact: true },
   { href: "/support/kb", label: "KB Articles", icon: BookOpen }
 ];

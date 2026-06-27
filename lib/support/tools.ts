@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db/client";
 import { kbDocuments, products } from "@/lib/db/schema";
 import { upsertClient } from "@/lib/db/persistence";
 import { seedClient, seedProducts } from "@/lib/seed";
+import { fetchSingleProductLive } from "@/lib/integrations/shopify";
 
 export interface KbHit {
   slug: string;
@@ -102,6 +103,11 @@ function cleanSnippet(raw: string | null | undefined): string {
 export async function getProductSnapshot(idOrHandleOrTitle: string): Promise<ProductHit | null> {
   const needle = idOrHandleOrTitle.trim();
   if (!needle) return null;
+
+  // Real-time first: hit Shopify live so price/stock/status are current at the
+  // moment of reply, not the daily snapshot. Falls through to the DB on miss/error.
+  const live = await fetchSingleProductLive(needle);
+  if (live) return live;
 
   const db = getDb();
   if (db) {

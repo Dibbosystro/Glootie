@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Inbox } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ReplyComposer } from "@/components/reply-composer";
 import { getDashboardData } from "@/lib/data";
@@ -22,13 +22,22 @@ export default async function SupportComposePage() {
               Paste a customer message. The agent searches the KB and looks up live Shopify stock before drafting a reply you can paste back.
             </p>
           </div>
-          <Link
-            href="/support/kb"
-            className="inline-flex items-center gap-2 rounded-md border border-[#e7e5e4] bg-white px-3 py-1.5 text-xs font-bold text-[#1c1917] transition hover:border-[#fbbf24] hover:bg-[#fffbeb]"
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            KB Articles
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/support/inbox"
+              className="inline-flex items-center gap-2 rounded-md border border-[#e7e5e4] bg-white px-3 py-1.5 text-xs font-bold text-[#1c1917] transition hover:border-[#fbbf24] hover:bg-[#fffbeb]"
+            >
+              <Inbox className="h-3.5 w-3.5" />
+              Chatway Inbox
+            </Link>
+            <Link
+              href="/support/kb"
+              className="inline-flex items-center gap-2 rounded-md border border-[#e7e5e4] bg-white px-3 py-1.5 text-xs font-bold text-[#1c1917] transition hover:border-[#fbbf24] hover:bg-[#fffbeb]"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              KB Articles
+            </Link>
+          </div>
         </section>
 
         <div className="flex flex-wrap items-center gap-4 rounded-md border border-[#e7e5e4] bg-[#fafaf9] px-4 py-2 text-[11px] text-[#57534e]">
