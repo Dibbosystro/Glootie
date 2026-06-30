@@ -71,6 +71,9 @@ interface RawConversation {
 
 interface Pagination {
   total_pages?: number;
+  current_page?: number;
+  total?: number;
+  per_page?: number;
 }
 
 function apiKey(): string {
@@ -274,6 +277,46 @@ export async function listOpenWaiting(opts: ListWaitingOptions = {}): Promise<Wa
   return waiting
     .filter((w): w is WaitingConversation => w !== null)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export interface ConversationListItem extends ChatwayConversation {
+  lastMessage: string;
+  ageLabel: string;
+  status: "open" | "resolved";
+}
+
+export interface ConversationsPage {
+  conversations: ConversationListItem[];
+  pagination: { currentPage: number; totalPages: number; total: number };
+}
+
+// Every conversation (open + resolved), newest first, one Chatway page (10) at a
+// time. No per-conversation enrichment, so it is cheap and supports the full
+// "all conversations" inbox with load-more pagination.
+export async function listConversations(page = 1): Promise<ConversationsPage> {
+  const data = await request<{ data: RawConversation[]; meta?: { pagination?: Pagination } }>(
+    "GET",
+    "/conversations/all",
+    { params: { page } }
+  );
+  const conversations: ConversationListItem[] = (data.data ?? []).map((raw) => {
+    const c = mapConversation(raw);
+    return {
+      ...c,
+      lastMessage: c.latestMessageContent,
+      ageLabel: ageLabel(c.createdAt),
+      status: c.isResolved ? "resolved" : "open"
+    };
+  });
+  const p = data.meta?.pagination;
+  return {
+    conversations,
+    pagination: {
+      currentPage: p?.current_page ?? page,
+      totalPages: p?.total_pages ?? 1,
+      total: p?.total ?? conversations.length
+    }
+  };
 }
 
 export interface CreateMessageInput {

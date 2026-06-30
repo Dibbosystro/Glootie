@@ -591,7 +591,7 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-                <ScrollArea className="max-h-80">
+                <div className="max-h-80 overflow-y-auto overscroll-contain">
                   <div className="py-1">
                     {notifications.length === 0 ? (
                       <div className="py-8 text-center">
@@ -617,7 +617,7 @@ export default function Home() {
                       ))
                     )}
                   </div>
-                </ScrollArea>
+                </div>
                 {notifications.length > 0 && (
                   <div className="border-t border-stone-100 dark:border-stone-800 p-2">
                     <button
