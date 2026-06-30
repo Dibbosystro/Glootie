@@ -1,0 +1,402 @@
+import "server-only";
+
+import type { Product } from "@/lib/backend-types";
+import { getServerEnv } from "@/lib/server-env";
+import { getCredentialValue } from "@/lib/db/credentials";
+import { persistShopifySnapshot, recordSyncRun } from "@/lib/db/persistence";
+import { seedClient } from "@/lib/seed";
+
+export interface ShopifySyncResult {
+  source: "shopify";
+  status: "success" | "demo" | "error";
+  rowsChanged: number;
+  message: string;
+}
+
+interface ShopifyProductRaw {
+  id: number;
+  title: string;
+  handle: string;
+  vendor: string;
+  product_type: string;
+  status: string;
+  image?: { src: string } | null;
+  variants?: Array<{ price: string; inventory_quantity: number }>;
+}
+
+interface ShopifyOrderRaw {
+  id: number;
+  cancelled_at: string | null;
+  line_items?: Array<{
+    product_id: number | null;
+    quantity: number;
+    price: string;
+    total_discount?: string;
+  }>;
+}
+
+interface ProductSalesSignal {
+  unitsSold30d: number;
+  revenue30d: number;
+}
+
+export interface ShopifyInsights {
+  revenue30d: number;
+  orders30d: number;
+  unitsSold30d: number;
+  sessions30d: number;
+  conversionRate: number;
+  activeProducts: number;
+  totalProducts: number;
+  totalInventory: number;
+  outOfStockProducts: number;
+}
+
+export async function syncShopify(): Promise<ShopifySyncResult> {
+  const shop = await getShopifyStoreDomain();
+  const token = await getShopifyAccessToken();
+  if (!shop || !token) {
+    const result = {
+      source: "shopify",
+      status: "demo",
+      rowsChanged: 0,
+      message: "Shopify credentials are missing, seed product data is being used."
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
+  }
+
+  try {
+    const { products, ordersRead } = await fetchShopifyProducts();
+    const persistence = await persistShopifySnapshot(seedClient, products);
+    const result = {
+      source: "shopify",
+      status: "success",
+      rowsChanged: products.length,
+      message: `Fetched ${products.length} Shopify products${ordersRead ? " with 30-day order signals" : ""}${persistence.persisted ? " and saved them to the database" : ""}.`
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
+  } catch (error) {
+    const result = {
+      source: "shopify",
+      status: "error",
+      rowsChanged: 0,
+      message: `Shopify sync failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    } as const;
+    await recordSyncRun(seedClient, result);
+    return result;
+  }
+}
+
+export async function fetchShopifyProducts(): Promise<{ products: Product[]; insights: ShopifyInsights; ordersRead: boolean }> {
+  const shop = await getShopifyStoreDomain();
+  const token = await getShopifyAccessToken();
+  if (!shop || !token) return { products: [], insights: emptyShopifyInsights(), ordersRead: false };
+
+  const rawProducts = await fetchAllShopifyPages<ShopifyProductRaw>(
+    `https://${shop}/admin/api/2026-01/products.json?limit=250&fields=id,title,handle,vendor,product_type,status,image,variants`
+  );
+
+  let salesResult = { salesByProduct: new Map<string, ProductSalesSignal>(), orders30d: 0 };
+  let ordersRead = false;
+
+  try {
+    salesResult = await fetchProductSalesSignals(shop, token);
+    ordersRead = true;
+  } catch {
+    // Product catalog access is enough for the monitor. Order access improves
+    // recommendations, but some Shopify tokens may not include read_orders.
+  }
+
+  const sessions30d = await fetchShopifyTotalSessions(shop, token);
+
+  const products = rawProducts.map((product) => mapShopifyProduct(product, salesResult.salesByProduct.get(String(product.id))));
+
+  return {
+    products,
+    insights: buildShopifyInsights(products, salesResult.orders30d, sessions30d),
+    ordersRead
+  };
+}
+
+async function fetchShopifyTotalSessions(shop: string, token: string): Promise<number> {
+  const query = `query { shopifyqlQuery(query: "FROM sessions SHOW sessions SINCE -30d UNTIL today") { tableData { rows } parseErrors } }`;
+  try {
+    const res = await fetch(`https://${shop}/admin/api/2026-01/graphql.json`, {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json"
+      },
+      cache: "no-store",
+      body: JSON.stringify({ query })
+    });
+    if (!res.ok) return 0;
+    const json = (await res.json()) as {
+      data?: { shopifyqlQuery?: { tableData?: { rows?: Array<Record<string, string | number>> } | null; parseErrors?: string[] | null } | null };
+      errors?: Array<{ message: string; extensions?: { code?: string } }>;
+    };
+    if (json.errors?.length) return 0;
+    if (json.data?.shopifyqlQuery?.parseErrors?.length) return 0;
+    const first = json.data?.shopifyqlQuery?.tableData?.rows?.[0];
+    const sessions = Number(first?.sessions ?? 0);
+    return Number.isFinite(sessions) ? Math.round(sessions) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchProductSalesSignals(shop: string, token: string): Promise<{ salesByProduct: Map<string, ProductSalesSignal>; orders30d: number }> {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const orders = await fetchAllShopifyPages<ShopifyOrderRaw>(
+    `https://${shop}/admin/api/2026-01/orders.json?limit=250&status=any&created_at_min=${encodeURIComponent(since)}&fields=id,cancelled_at,line_items`,
+    token
+  );
+  const salesByProduct = new Map<string, ProductSalesSignal>();
+  let orders30d = 0;
+
+  for (const order of orders) {
+    if (order.cancelled_at) continue;
+    orders30d += 1;
+    for (const item of order.line_items ?? []) {
+      if (!item.product_id) continue;
+      const productId = String(item.product_id);
+      const current = salesByProduct.get(productId) ?? { unitsSold30d: 0, revenue30d: 0 };
+      const quantity = Number(item.quantity || 0);
+      const revenue = Math.max(0, Number(item.price || 0) * quantity - Number(item.total_discount || 0));
+      salesByProduct.set(productId, {
+        unitsSold30d: current.unitsSold30d + quantity,
+        revenue30d: current.revenue30d + revenue
+      });
+    }
+  }
+
+  return { salesByProduct, orders30d };
+}
+
+async function fetchAllShopifyPages<T>(firstUrl: string, providedToken?: string): Promise<T[]> {
+  const token = providedToken ?? (await getShopifyAccessToken());
+  if (!token) return [];
+
+  const rows: T[] = [];
+  let url: string | null = firstUrl;
+
+  while (url) {
+    const res = await fetch(url, {
+      headers: { "X-Shopify-Access-Token": token },
+      cache: "no-store"
+    });
+    if (!res.ok) {
+      throw new Error(`${res.status} ${await res.text()}`);
+    }
+
+    const json = (await res.json()) as { products?: T[]; orders?: T[] };
+    rows.push(...(json.products ?? json.orders ?? []));
+    url = getNextPageUrl(res.headers.get("link"));
+  }
+
+  return rows;
+}
+
+function mapShopifyProduct(product: ShopifyProductRaw, sales?: ProductSalesSignal): Product {
+  const variants = product.variants ?? [];
+  const firstVariant = variants[0];
+  const inventoryQty = variants.reduce((sum, variant) => sum + Number(variant.inventory_quantity || 0), 0);
+  const revenue30d = Number((sales?.revenue30d ?? 0).toFixed(2));
+  const unitsSold30d = sales?.unitsSold30d ?? 0;
+  return {
+    id: `shopify-${product.id}`,
+    shopifyId: String(product.id),
+    title: product.title,
+    handle: product.handle,
+    vendor: product.vendor || "",
+    productType: product.product_type || "Uncategorized",
+    price: Number(firstVariant?.price ?? 0),
+    cost: 0,
+    imageUrl: product.image?.src || fallbackProductImage(product.title),
+    inventoryQty,
+    status: normalizeShopifyStatus(product.status),
+    unitsSold30d,
+    revenue30d,
+    sessions30d: 0,
+    conversionRate: unitsSold30d > 0 ? 0.01 : 0
+  };
+}
+
+function buildShopifyInsights(products: Product[], orders30d: number, sessions30d: number): ShopifyInsights {
+  const revenue30d = products.reduce((sum, product) => sum + product.revenue30d, 0);
+  const unitsSold30d = products.reduce((sum, product) => sum + product.unitsSold30d, 0);
+  const activeProducts = products.filter((product) => product.status === "active").length;
+  const totalInventory = products
+    .filter((product) => product.status === "active")
+    .reduce((sum, product) => sum + Math.max(0, product.inventoryQty), 0);
+  const outOfStockProducts = products.filter((product) => product.status === "active" && product.inventoryQty <= 0).length;
+  const conversionRate = sessions30d > 0 ? orders30d / sessions30d : 0;
+  return {
+    revenue30d: Number(revenue30d.toFixed(2)),
+    orders30d,
+    unitsSold30d,
+    sessions30d,
+    conversionRate: Number(conversionRate.toFixed(4)),
+    activeProducts,
+    totalProducts: products.length,
+    totalInventory,
+    outOfStockProducts
+  };
+}
+
+function emptyShopifyInsights(): ShopifyInsights {
+  return {
+    revenue30d: 0,
+    orders30d: 0,
+    unitsSold30d: 0,
+    sessions30d: 0,
+    conversionRate: 0,
+    activeProducts: 0,
+    totalProducts: 0,
+    totalInventory: 0,
+    outOfStockProducts: 0
+  };
+}
+
+function getNextPageUrl(linkHeader: string | null): string | null {
+  if (!linkHeader) return null;
+  const nextPart = linkHeader.split(",").find((part) => part.includes('rel="next"'));
+  const match = nextPart?.match(/<([^>]+)>/);
+  return match?.[1] ?? null;
+}
+
+function normalizeShopifyStatus(status: string): Product["status"] {
+  if (status === "draft" || status === "archived") return status;
+  return "active";
+}
+
+async function getShopifyStoreDomain() {
+  const raw = (await getCredentialValue("shopify", "SHOPIFY_STORE_DOMAIN")) || getServerEnv("SHOPIFY_CRG_STORE");
+  return raw?.replace(/^https?:\/\//, "").replace(/\/$/, "");
+}
+
+async function getShopifyAccessToken() {
+  return (await getCredentialValue("shopify", "SHOPIFY_ADMIN_ACCESS_TOKEN")) || getServerEnv("SHOPIFY_CRG_TOKEN");
+}
+
+// Public storefront domain, used to build product links a human can paste to a
+// customer. CRG's storefront is caferacergarageshop.com (verified); override via
+// SHOPIFY_CRG_STOREFRONT. Falls back to the admin/myshopify domain if neither set.
+export async function getStorefrontDomain(): Promise<string> {
+  const explicit = (await getCredentialValue("shopify", "SHOPIFY_STOREFRONT_DOMAIN")) || getServerEnv("SHOPIFY_CRG_STOREFRONT");
+  if (explicit) return explicit.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  return "caferacergarageshop.com";
+}
+
+export async function productUrl(handle: string): Promise<string> {
+  const domain = await getStorefrontDomain();
+  return `https://${domain}/products/${handle}`;
+}
+
+export interface LiveProduct {
+  title: string;
+  handle: string;
+  shopifyId: string;
+  price: string;
+  inventoryQty: number;
+  status: "active" | "draft" | "archived";
+}
+
+interface ShopifyGraphProductNode {
+  legacyResourceId: string;
+  title: string;
+  handle: string;
+  status: string;
+  totalInventory: number | null;
+  variants: { nodes: Array<{ price: string; sku: string | null; inventoryQuantity: number | null }> };
+}
+
+function mapGraphProduct(node: ShopifyGraphProductNode): LiveProduct {
+  const variants = node.variants?.nodes ?? [];
+  const firstVariant = variants[0];
+  const inventoryQty =
+    typeof node.totalInventory === "number"
+      ? node.totalInventory
+      : variants.reduce((sum, v) => sum + Number(v.inventoryQuantity || 0), 0);
+  const statusLower = (node.status || "").toLowerCase();
+  const status = statusLower === "draft" || statusLower === "archived" ? statusLower : "active";
+  return {
+    title: node.title,
+    handle: node.handle,
+    shopifyId: String(node.legacyResourceId),
+    price: String(firstVariant?.price ?? "0"),
+    inventoryQty,
+    status
+  };
+}
+
+// Real-time product search straight from Shopify Admin GraphQL (no DB snapshot),
+// so replies quote current price/stock/status. Returns [] on no match or error.
+export async function searchProductsLive(idOrHandleOrTitle: string, limit = 5): Promise<LiveProduct[]> {
+  const needle = idOrHandleOrTitle.trim();
+  if (!needle) return [];
+  const shop = await getShopifyStoreDomain();
+  const token = await getShopifyAccessToken();
+  if (!shop || !token) return [];
+
+  const esc = needle.replace(/["\\]/g, " ").trim();
+  if (!esc) return [];
+  const q = /\s/.test(esc) ? esc : `${esc} OR sku:${esc} OR handle:${esc}`;
+  const query = `query ProductLookup($q: String!, $n: Int!) {
+    products(first: $n, query: $q) {
+      nodes {
+        legacyResourceId
+        title
+        handle
+        status
+        totalInventory
+        variants(first: 50) { nodes { price sku inventoryQuantity } }
+      }
+    }
+  }`;
+
+  try {
+    const res = await fetch(`https://${shop}/admin/api/2026-01/graphql.json`, {
+      method: "POST",
+      headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ query, variables: { q, n: Math.max(1, Math.min(limit, 20)) } })
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      data?: { products?: { nodes?: ShopifyGraphProductNode[] } };
+      errors?: unknown;
+    };
+    if (json.errors) return [];
+    return (json.data?.products?.nodes ?? []).map(mapGraphProduct);
+  } catch {
+    return [];
+  }
+}
+
+// Single best match, for the support agent's get_product tool.
+export async function fetchSingleProductLive(idOrHandleOrTitle: string): Promise<LiveProduct | null> {
+  const hits = await searchProductsLive(idOrHandleOrTitle, 1);
+  return hits[0] ?? null;
+}
+
+// Live matches plus their public storefront URLs, for the inbox product picker.
+export async function searchProductsWithUrls(
+  q: string,
+  limit = 5
+): Promise<Array<LiveProduct & { url: string }>> {
+  const hits = await searchProductsLive(q, limit);
+  const domain = await getStorefrontDomain();
+  return hits.map((p) => ({ ...p, url: `https://${domain}/products/${p.handle}` }));
+}
+
+function fallbackProductImage(title: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><rect width="240" height="240" fill="#f5f5f4"/><circle cx="120" cy="120" r="72" fill="#b45309" opacity=".16"/><text x="120" y="126" text-anchor="middle" font-family="Arial" font-size="18" font-weight="700" fill="#1c1917">${escapeSvg(title.slice(0, 2).toUpperCase())}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function escapeSvg(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[char] ?? char));
+}
