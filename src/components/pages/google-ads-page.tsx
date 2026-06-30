@@ -305,21 +305,21 @@ export default function GoogleAdsPage() {
     return Array.from(map.values()).sort((a, b) => b.spend - a.spend)
   }, [allGoogleCampaignsRaw])
 
-  // Sparkline data (approximate Google's share from daily metrics)
-  const sparkRevenue = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.revenue * 0.32)) ?? [], [data])
-  const sparkSpend = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.spend * 0.33)) ?? [], [data])
-  const sparkRoas = useMemo(() => data?.dailyMetrics.slice(-14).map(d => {
-    const s = d.spend * 0.33
-    return s > 0 ? Math.round((d.revenue * 0.32 / s) * 100) / 100 : 0
-  }) ?? [], [data])
-  const sparkPurchases = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.purchases * 0.31)) ?? [], [data])
+  // No live Google Ads daily breakdown yet. Show empty series until connected,
+  // rather than deriving fake Google numbers from Meta's daily metrics.
+  const sparkRevenue = useMemo(() => (isGoogleConfigured ? data?.dailyMetrics.slice(-14).map(d => Math.round(d.revenue)) ?? [] : []), [data, isGoogleConfigured])
+  const sparkSpend = useMemo(() => (isGoogleConfigured ? data?.dailyMetrics.slice(-14).map(d => Math.round(d.spend)) ?? [] : []), [data, isGoogleConfigured])
+  const sparkRoas = useMemo(() => (isGoogleConfigured ? data?.dailyMetrics.slice(-14).map(d => {
+    return d.spend > 0 ? Math.round((d.revenue / d.spend) * 100) / 100 : 0
+  }) ?? [] : []), [data, isGoogleConfigured])
+  const sparkPurchases = useMemo(() => (isGoogleConfigured ? data?.dailyMetrics.slice(-14).map(d => Math.round(d.purchases)) ?? [] : []), [data, isGoogleConfigured])
 
   // Daily spend data
   const dailySpendData = useMemo(() => {
-    if (!data) return []
+    if (!data || !isGoogleConfigured) return []
     return data.dailyMetrics.map(d => ({
       date: d.date,
-      spend: Math.round(d.spend * 0.33),
+      spend: Math.round(d.spend),
     }))
   }, [data])
 

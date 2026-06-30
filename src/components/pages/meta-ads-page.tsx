@@ -287,21 +287,20 @@ export default function MetaAdsPage() {
     return Array.from(map.values()).sort((a, b) => b.spend - a.spend)
   }, [allMetaCampaignsRaw])
 
-  // Sparkline data
-  const sparkRevenue = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.revenue * 0.66)) ?? [], [data])
-  const sparkSpend = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.spend * 0.66)) ?? [], [data])
+  // Sparkline data (dailyMetrics is real Meta account daily, use it directly)
+  const sparkRevenue = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.revenue)) ?? [], [data])
+  const sparkSpend = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.spend)) ?? [], [data])
   const sparkRoas = useMemo(() => data?.dailyMetrics.slice(-14).map(d => {
-    const s = d.spend * 0.66
-    return s > 0 ? Math.round((d.revenue * 0.66 / s) * 100) / 100 : 0
+    return d.spend > 0 ? Math.round((d.revenue / d.spend) * 100) / 100 : 0
   }) ?? [], [data])
-  const sparkPurchases = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.purchases * 0.69)) ?? [], [data])
+  const sparkPurchases = useMemo(() => data?.dailyMetrics.slice(-14).map(d => Math.round(d.purchases)) ?? [], [data])
 
   // Daily spend data
   const dailySpendData = useMemo(() => {
     if (!data) return []
     return data.dailyMetrics.map(d => ({
       date: d.date,
-      spend: Math.round(d.spend * 0.66),
+      spend: Math.round(d.spend),
     }))
   }, [data])
 

@@ -103,6 +103,48 @@ export async function fetchMetaCampaigns(): Promise<AdCampaign[]> {
     .sort((a, b) => b.spend30d - a.spend30d);
 }
 
+export interface MetaDailyMetric {
+  date: string;
+  spend: number;
+  revenue: number;
+  purchases: number;
+  clicks: number;
+  impressions: number;
+}
+
+interface MetaDailyInsightRaw extends MetaInsightRaw {
+  date_start?: string;
+}
+
+// Account-level daily spend/revenue for the last 30 days, for the dashboard's
+// daily chart. Returns [] when Meta is not connected (no dummy data).
+export async function fetchMetaDailyMetrics(): Promise<MetaDailyMetric[]> {
+  const token = await getCredentialValue("meta", "META_ACCESS_TOKEN");
+  const adAccountId = await getCredentialValue("meta", "META_AD_ACCOUNT_ID");
+  if (!token || !adAccountId) return [];
+
+  const acct = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+  const rows = await fetchMetaPages<MetaDailyInsightRaw>(buildMetaUrl(`/${acct}/insights`, token, {
+    level: "account",
+    date_preset: "last_30d",
+    time_increment: "1",
+    fields: "spend,impressions,clicks,actions,action_values",
+    limit: "500"
+  }));
+
+  return rows
+    .map((row) => ({
+      date: row.date_start ?? "",
+      spend: roundMoney(Number(row.spend ?? 0)),
+      revenue: roundMoney(getActionValue(row.action_values, "purchase")),
+      purchases: getActionValue(row.actions, "purchase"),
+      clicks: Number(row.clicks ?? 0),
+      impressions: Number(row.impressions ?? 0)
+    }))
+    .filter((row) => row.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 async function fetchMetaPages<T>(firstUrl: string): Promise<T[]> {
   const rows: T[] = [];
   let url: string | null = firstUrl;
