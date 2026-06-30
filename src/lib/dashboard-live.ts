@@ -20,13 +20,11 @@ function detectConnections() {
   return {
     shopify: Boolean(shopifyDomain && shopifyToken),
     meta: Boolean(getServerEnv("META_ACCESS_TOKEN") && getServerEnv("META_AD_ACCOUNT_ID")),
-    google: Boolean(
-      getServerEnv("GOOGLE_ADS_DEVELOPER_TOKEN") &&
-      getServerEnv("GOOGLE_ADS_CLIENT_ID") &&
-      getServerEnv("GOOGLE_ADS_CLIENT_SECRET") &&
-      getServerEnv("GOOGLE_ADS_REFRESH_TOKEN") &&
-      getServerEnv("GOOGLE_ADS_CUSTOMER_ID")
-    ),
+    // Live Google Ads campaign sync is not built yet, so even when OAuth creds
+    // exist we surface Google as not connected (empty state + Connect prompt)
+    // rather than an empty page that claims to be connected. Flip on when a real
+    // Google fetch is added.
+    google: false,
     ai: Boolean(getServerEnv("NEOKENS_KEY") || getServerEnv("OPENAI_API_KEY") || getServerEnv("ANTHROPIC_API_KEY")),
   };
 }
