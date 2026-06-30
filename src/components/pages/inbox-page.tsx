@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   Search, RefreshCw, Sparkles, Send, Clock, MessageCircle, CheckCircle2,
@@ -134,12 +134,16 @@ export default function InboxPage() {
   const statusFilter: 'all' | 'open' | 'resolved' = tab === 'open' ? 'open' : tab === 'resolved' ? 'resolved' : 'all'
 
   // --- Smart waiting view (enriched) ---
+  // placeholderData keeps the old list on screen while refetching (no blank
+  // skeleton on tab switch); refetchInterval auto-pulls new messages.
   const waitingQuery = useQuery<{ conversations: WaitingConversation[] }>({
     queryKey: ['chatway-waiting'],
     queryFn: () => getJson('/api/support/chatway/conversations?scope=waiting&pages=4'),
     enabled: scope === 'waiting',
-    staleTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   })
 
   // --- Full inbox (every conversation), paginated with load-more ---
@@ -150,8 +154,10 @@ export default function InboxPage() {
     getNextPageParam: (last) =>
       last.pagination.currentPage < last.pagination.totalPages ? last.pagination.currentPage + 1 : undefined,
     enabled: scope === 'all',
-    staleTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   })
 
   const totalAll = allQuery.data?.pages[0]?.pagination.total ?? 0
@@ -196,8 +202,11 @@ export default function InboxPage() {
     queryKey: ['chatway-thread', selectedId],
     queryFn: () => getJson(`/api/support/chatway/messages?conversationId=${encodeURIComponent(selectedId!)}`),
     enabled: Boolean(selectedId),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
+    staleTime: 20_000,
+    placeholderData: keepPreviousData,
+    // Poll the open thread so a customer's new reply shows without a manual refresh.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   })
   const thread = threadData?.messages ?? []
 
@@ -274,23 +283,10 @@ export default function InboxPage() {
   const sending = sendMutation.isPending
   const drafting = composeMutation.isPending
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-3"><Skeleton className="h-7 w-20" /><Skeleton className="h-5 w-16" /></div>
-        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-0 bg-white dark:bg-stone-900 rounded-xl border border-stone-200/60 dark:border-stone-800 overflow-hidden h-[600px]">
-          <div className="border-r border-stone-200 dark:border-stone-800 p-4 space-y-3">
-            <Skeleton className="h-9 w-full rounded-lg" />
-            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
-          </div>
-          <div className="p-6 flex flex-col items-center justify-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
-            <p className="text-xs text-stone-400">Loading conversations from Chatway...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // First-ever load of the active scope (no cached/persisted data yet). We keep
+  // the header, tabs and search mounted and only show skeletons inside the list,
+  // so switching tabs never wipes the whole panel.
+  const listLoading = isLoading && conversations.length === 0
 
   return (
     <div className="space-y-4">
@@ -306,9 +302,15 @@ export default function InboxPage() {
             <Badge className="bg-amber-100 text-amber-700 border-0 text-[10px] font-semibold">{unreadCount} unread</Badge>
           )}
         </div>
-        <Button variant="outline" size="sm" className="h-8 text-xs border-stone-200 dark:border-stone-700" onClick={() => refetchConvs()} disabled={isFetching}>
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center gap-1.5 text-[10px] text-stone-400" title="Conversations auto-refresh in the background">
+            <span className={`w-1.5 h-1.5 rounded-full ${isFetching ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+            {isFetching ? 'Refreshing' : 'Live'}
+          </span>
+          <Button variant="outline" size="sm" className="h-8 text-xs border-stone-200 dark:border-stone-700" onClick={() => refetchConvs()} disabled={isFetching}>
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        </div>
       </motion.div>
 
       {listError && (
@@ -349,6 +351,21 @@ export default function InboxPage() {
 
           <ScrollArea className="flex-1 min-h-0">
             <div className="p-2 space-y-1">
+              {listLoading && (
+                <div className="space-y-1">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-2.5 p-3">
+                      <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-3 w-2/3 rounded" />
+                        <Skeleton className="h-2.5 w-full rounded" />
+                        <Skeleton className="h-2.5 w-1/3 rounded" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {conversations.map((conv) => (
                 <button
                   key={conv.id}
@@ -387,7 +404,7 @@ export default function InboxPage() {
                 </button>
               ))}
 
-              {conversations.length === 0 && (
+              {!listLoading && conversations.length === 0 && (
                 <div className="py-12 text-center">
                   <MessageCircle className="w-8 h-8 mx-auto text-stone-300 dark:text-stone-600 mb-2" />
                   <p className="text-xs text-stone-400">{search ? 'No loaded conversations match your search' : 'No conversations here'}</p>
