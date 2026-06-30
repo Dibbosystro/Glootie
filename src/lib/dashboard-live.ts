@@ -175,6 +175,13 @@ async function buildLiveDashboard(): Promise<DashboardData> {
   const backendMeta = metaRes.status === "fulfilled" ? metaRes.value : [];
   const dailyMetrics: DailyMetric[] = dailyRes.status === "fulfilled" ? (dailyRes.value as DailyMetric[]) : [];
 
+  // Capture fetch errors so a connected-but-failing integration shows an error
+  // state instead of a misleading "Connected" with empty data.
+  const reason = (r: PromiseSettledResult<unknown>) =>
+    r.status === "rejected" ? String((r.reason as Error)?.message ?? r.reason).slice(0, 300) : undefined;
+  const shopifyError = reason(shopifyRes);
+  const metaError = reason(metaRes) ?? reason(dailyRes);
+
   const products = backendProducts.map(toZProduct);
   const metaCampaigns = backendMeta.map(toZCampaign);
   const campaigns = [...metaCampaigns]; // Google omitted until connected.
@@ -184,11 +191,19 @@ async function buildLiveDashboard(): Promise<DashboardData> {
   const kpi = kpiOf(campaigns);
 
   const now = new Date().toISOString();
+  const shopifyStatus = !conn.shopify ? "not_connected" : shopifyError ? "error" : "connected";
+  const metaStatus = !conn.meta ? "not_connected" : metaError ? "error" : "connected";
   const syncStatus: SyncStatus = {
-    shopify: { lastSync: conn.shopify ? now : null, status: conn.shopify ? "connected" : "not_connected" },
-    meta: { lastSync: conn.meta ? now : null, status: conn.meta ? "connected" : "not_connected" },
+    shopify: { lastSync: conn.shopify && !shopifyError ? now : null, status: shopifyStatus },
+    meta: { lastSync: conn.meta && !metaError ? now : null, status: metaStatus },
     googleAds: { lastSync: null, status: conn.google ? "connected" : "not_connected" },
   };
+
+  const integrations = buildIntegrations(conn).map((i) => {
+    if (i.type === "meta" && metaError) return { ...i, status: "error" };
+    if (i.type === "shopify" && shopifyError) return { ...i, status: "error" };
+    return i;
+  });
 
   return {
     kpi,
@@ -199,9 +214,12 @@ async function buildLiveDashboard(): Promise<DashboardData> {
     metaKpi,
     googleKpi,
     activities: [],
-    integrations: buildIntegrations(conn),
+    integrations,
     conversations: [],
-  };
+    // Non-typed diagnostic channel: surfaces the real fetch error so a connected
+    // integration that returns empty can be told apart from a true failure.
+    _diagnostics: { meta: metaError ?? null, shopify: shopifyError ?? null },
+  } as DashboardData;
 }
 
 // Cache the heavy live fetch for 2 minutes so navigating between pages (the shell

@@ -563,23 +563,14 @@ export default function Home() {
             {/* Notifications */}
             <Popover open={notifOpen} onOpenChange={setNotifOpen}>
               <PopoverTrigger asChild>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" data-tour="notifications" className="w-8 h-8 text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 relative">
-                        <Bell className="w-4 h-4" />
-                        {unreadCount2 > 0 && (
-                          <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1 shadow-sm ring-2 ring-red-500/20">
-                            {unreadCount2}
-                          </span>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      {unreadCount2 > 0 ? `${unreadCount2} unread` : 'No notifications'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button variant="ghost" size="icon" data-tour="notifications" aria-label="Notifications" className="w-8 h-8 text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 relative">
+                  <Bell className="w-4 h-4" />
+                  {unreadCount2 > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold px-1 shadow-sm ring-2 ring-red-500/20">
+                      {unreadCount2}
+                    </span>
+                  )}
+                </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[360px] p-0" align="end" sideOffset={8}>
                 <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 dark:border-stone-800">

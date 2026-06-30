@@ -289,7 +289,7 @@ export default function InboxPage() {
         className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/60 dark:border-stone-800 shadow-sm overflow-hidden grid grid-cols-1 md:grid-cols-[320px_1fr] h-[calc(100vh-180px)] min-h-[500px]"
       >
         {/* Conversation list */}
-        <div className="border-r border-stone-200/60 dark:border-stone-800 flex flex-col">
+        <div className="border-r border-stone-200/60 dark:border-stone-800 flex flex-col min-h-0">
           <div className="p-3 border-b border-stone-100 dark:border-stone-800">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
@@ -308,7 +308,7 @@ export default function InboxPage() {
             <span className="ml-auto inline-flex items-center justify-center min-w-[16px] h-4 rounded-full bg-stone-200 dark:bg-stone-700 text-[10px] tabular-nums px-1 font-semibold">{filtered.length}</span>
           </div>
 
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="p-2 space-y-1">
               {filtered.map((conv) => (
                 <button
@@ -358,7 +358,7 @@ export default function InboxPage() {
         </div>
 
         {/* Message thread */}
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 min-h-0 overflow-hidden">
           {selected ? (
             <>
               {/* Conversation header */}
@@ -384,7 +384,7 @@ export default function InboxPage() {
               </div>
 
               {/* Messages */}
-              <ScrollArea className="flex-1 p-5">
+              <ScrollArea className="flex-1 min-h-0 p-5">
                 <div className="space-y-4 max-w-2xl mx-auto">
                   {threadLoading && (
                     <div className="flex flex-col items-center justify-center py-10 gap-2 text-stone-400">

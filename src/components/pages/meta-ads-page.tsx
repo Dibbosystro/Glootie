@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -210,6 +210,29 @@ export default function MetaAdsPage() {
     queryFn: () => fetch('/api/dashboard').then(r => r.json()),
     staleTime: 60_000,
   })
+
+  const queryClient = useQueryClient()
+  const [syncing, setSyncing] = useState(false)
+
+  // Real Meta connection state (connected / error / not connected) from the
+  // live dashboard, so the pill reflects reality instead of always "Connected".
+  const metaIntegration = data?.integrations.find(i => i.type === 'meta')
+  const metaState: 'connected' | 'error' | 'off' =
+    metaIntegration?.status === 'error' ? 'error'
+      : metaIntegration?.configured ? 'connected' : 'off'
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true)
+    try {
+      await fetch('/api/dashboard/refresh', { method: 'POST' })
+      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Meta data refreshed from the live account.')
+    } catch {
+      toast.error('Sync failed. Please try again.')
+    } finally {
+      setSyncing(false)
+    }
+  }, [queryClient])
 
   // Merge seed + user-created meta campaigns
   const allMetaCampaignsRaw: MergedCampaign[] = useMemo(() => {
@@ -442,13 +465,27 @@ export default function MetaAdsPage() {
           <h2 className="text-lg font-bold text-stone-900 dark:text-stone-100">Meta Ads</h2>
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="outline" className="text-[10px] font-medium border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400">Last 30 days</Badge>
-            <span className="inline-flex items-center gap-1.5 text-[10px] text-green-600 dark:text-green-400">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            {metaState === 'connected' && (
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-green-600 dark:text-green-400">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                </span>
+                Connected
               </span>
-              Connected
-            </span>
+            )}
+            {metaState === 'error' && (
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-red-600 dark:text-red-400">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                Sync error (check Meta token)
+              </span>
+            )}
+            {metaState === 'off' && (
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-stone-500">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-stone-400" />
+                Not connected
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -460,9 +497,9 @@ export default function MetaAdsPage() {
             <Plus className="w-3.5 h-3.5" />
             Create Campaign
           </Button>
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Sync
+          <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing} className="h-8 text-xs gap-1.5">
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync'}
           </Button>
         </div>
       </motion.div>
