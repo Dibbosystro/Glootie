@@ -11,3 +11,6 @@ coverage
 *.tsbuildinfo
 .DS_Store
 vercel-env-import.txt
+# z.ai design export kept locally as a reference only (has its own .git, a local
+# DB, ~100 QA screenshots and agent logs). Never commit it.
+z-created-glootie/
